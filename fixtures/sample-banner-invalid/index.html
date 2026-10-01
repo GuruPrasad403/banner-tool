@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Invalid Dimension Banner 305x250</title>
+  <style>
+    #banner {
+      width: 305px; /* Intentionally incorrect width (305px vs expected 300px) */
+      height: 250px;
+      background: #ffffff;
+      border: 1px solid red;
+    }
+  </style>
+</head>
+<body>
+  <div id="banner">
+    <div id="header">Header</div>
+    <div id="body-copy">Body Copy</div>
+    <div id="isi-container" style="height: 150px; overflow-y: scroll;">
+      <p>ISI line 1</p>
+      <p style="margin-top: 500px;">ISI line 2</p>
+    </div>
+  </div>
+</body>
+</html>

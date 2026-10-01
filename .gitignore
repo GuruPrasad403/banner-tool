@@ -1,0 +1,28 @@
+# Dependencies
+/node_modules/
+
+# Generated validation reports, screenshots, and temporary uploads
+/output/*
+!/output/.gitkeep
+/temp/*
+!/temp/.gitkeep
+
+# Environment variables and local secrets
+.env
+.env.*
+!.env.example
+
+# Logs and test artifacts
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+/coverage/
+/test-results/
+
+# Operating system and editor files
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/

@@ -1,0 +1,67 @@
+export const defaultBannerProfiles = {
+  "mobile-small": {
+    id: "mobile-small",
+    name: "Mobile Small (300x250)",
+    width: 300,
+    height: 250,
+    widthTolerance: 0,
+    heightTolerance: 0,
+    rootSelector: "#banner",
+    fixedSelectors: ["#header", "#body-copy"],
+    isiSelector: "#isi-container",
+    deviceScaleFactor: 2,
+    overlap: 10
+  },
+  "mobile-large": {
+    id: "mobile-large",
+    name: "Mobile Large (320x480)",
+    width: 320,
+    height: 480,
+    widthTolerance: 0,
+    heightTolerance: 0,
+    rootSelector: "#banner",
+    fixedSelectors: ["#header", "#body-copy"],
+    isiSelector: "#isi-container",
+    deviceScaleFactor: 2,
+    overlap: 15
+  },
+  "leaderboard": {
+    id: "leaderboard",
+    name: "Leaderboard (728x90)",
+    width: 728,
+    height: 90,
+    widthTolerance: 0,
+    heightTolerance: 0,
+    rootSelector: "#banner",
+    fixedSelectors: ["#header", "#body-copy"],
+    isiSelector: "#isi-container",
+    deviceScaleFactor: 2,
+    overlap: 10
+  },
+  "half-page": {
+    id: "half-page",
+    name: "Half Page (300x600)",
+    width: 300,
+    height: 600,
+    widthTolerance: 0,
+    heightTolerance: 0,
+    rootSelector: "#banner",
+    fixedSelectors: ["#header", "#body-copy"],
+    isiSelector: "#isi-container",
+    deviceScaleFactor: 2,
+    overlap: 20
+  },
+  "custom": {
+    id: "custom",
+    name: "Custom Dimensions",
+    width: null,
+    height: null,
+    widthTolerance: 0,
+    heightTolerance: 0,
+    rootSelector: null,
+    fixedSelectors: [],
+    isiSelector: null,
+    deviceScaleFactor: 2,
+    overlap: 10
+  }
+};

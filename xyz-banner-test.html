@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>XYZ Banner Test Fixture</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      background: #e5e7eb;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    /* Fixed banner frame: 300 x 250 CSS pixels */
+    #banner {
+      width: 300px;
+      height: 250px;
+      overflow: hidden;
+      position: relative;
+      background: #ffffff;
+      color: #111827;
+      border: 1px solid #111827;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Fixed region 1 */
+    #header {
+      height: 48px;
+      flex: 0 0 48px;
+      padding: 8px 12px;
+      background: #111827;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    #header .brand {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    #header .tag {
+      font-size: 9px;
+      padding: 3px 5px;
+      border: 1px solid #ffffff;
+      border-radius: 3px;
+    }
+
+    /* Fixed region 2 */
+    #body-copy {
+      height: 62px;
+      flex: 0 0 62px;
+      padding: 7px 12px;
+      background: #f3f4f6;
+      border-bottom: 1px solid #d1d5db;
+    }
+
+    #body-copy h1 {
+      margin: 0 0 3px;
+      font-size: 14px;
+      line-height: 17px;
+    }
+
+    #body-copy p {
+      margin: 0;
+      font-size: 9px;
+      line-height: 12px;
+      color: #374151;
+    }
+
+    /*
+      IMPORTANT:
+      This is the nested scrollable ISI container.
+      The automation tool should scroll THIS element only.
+    */
+    #isi-container {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      background: #ffffff;
+      scrollbar-width: thin;
+    }
+
+    #isi-content {
+      padding: 10px 12px 16px;
+    }
+
+    #isi-content h2 {
+      margin: 0 0 6px;
+      font-size: 11px;
+      line-height: 14px;
+      color: #111827;
+    }
+
+    #isi-content h3 {
+      margin: 12px 0 4px;
+      font-size: 10px;
+      line-height: 13px;
+    }
+
+    #isi-content p,
+    #isi-content li {
+      font-size: 8px;
+      line-height: 11px;
+      color: #374151;
+    }
+
+    #isi-content p {
+      margin: 0 0 7px;
+    }
+
+    #isi-content ul {
+      margin: 0 0 8px 15px;
+      padding: 0;
+    }
+
+    #isi-content li {
+      margin-bottom: 4px;
+    }
+
+    .warning {
+      padding: 6px;
+      margin: 8px 0;
+      border: 1px solid #9ca3af;
+      background: #f9fafb;
+      font-weight: 700;
+    }
+
+    .end-marker {
+      margin-top: 12px;
+      padding: 8px;
+      border-top: 2px solid #111827;
+      text-align: center;
+      font-size: 9px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!--
+    TEST BANNER
+    Expected dimensions: 300 x 250
+    Fixed sections:
+      #header
+      #body-copy
+    Nested scrollable section:
+      #isi-container
+  -->
+
+  <div id="banner" data-banner-width="300" data-banner-height="250">
+
+    <!-- FIXED SECTION -->
+    <header id="header" data-banner-section="header">
+      <div class="brand">XYZ HEALTH</div>
+      <div class="tag">TEST BANNER</div>
+    </header>
+
+    <!-- FIXED SECTION -->
+    <section id="body-copy" data-banner-section="body">
+      <h1>Important Product Information</h1>
+      <p>
+        This is fake banner content created to test automated screenshots,
+        fixed sections, dimension validation, and nested ISI scrolling.
+      </p>
+    </section>
+
+    <!-- SCROLLABLE SECTION -->
+    <section
+      id="isi-container"
+      data-banner-section="isi"
+      aria-label="Important Safety Information"
+    >
+      <div id="isi-content">
+
+        <h2>IMPORTANT SAFETY INFORMATION</h2>
+
+        <p>
+          This is test content only. It is not medical advice and does not
+          describe a real medicine or real safety information.
+        </p>
+
+        <div class="warning">
+          TEST CONTENT — DO NOT USE FOR PRODUCTION OR MEDICAL PURPOSES.
+        </div>
+
+        <h3>Indication</h3>
+
+        <p>
+          Example product information is displayed here so that the automation
+          system has enough content to create multiple screenshots. The header
+          and body section above should remain fixed while this section scrolls.
+        </p>
+
+        <h3>Important Warnings</h3>
+
+        <p>
+          Example warning paragraph one. The automated screenshot engine should
+          capture this text in one or more frames depending on the visible ISI
+          viewport height.
+        </p>
+
+        <p>
+          Example warning paragraph two. This intentionally adds additional
+          content to increase the scroll height of the nested ISI container.
+        </p>
+
+        <ul>
+          <li>Example safety statement for testing.</li>
+          <li>Example warning statement for testing.</li>
+          <li>Example monitoring statement for testing.</li>
+          <li>Example precaution statement for testing.</li>
+        </ul>
+
+        <h3>Adverse Reactions</h3>
+
+        <p>
+          Example adverse reaction content. This paragraph is intentionally
+          longer so the screenshot tool can demonstrate partial viewport
+          coverage and screenshot overlap.
+        </p>
+
+        <p>
+          Additional test content is included to make the ISI container
+          substantially taller than its visible area. The automation engine
+          should calculate the required scroll positions automatically.
+        </p>
+
+        <h3>Warnings and Precautions</h3>
+
+        <p>
+          The fixed header should remain at exactly the same location while
+          the ISI content underneath it moves between screenshot frames.
+        </p>
+
+        <p>
+          The fixed body copy should also remain unchanged across all generated
+          screenshots. Only the nested ISI scroll position should change.
+        </p>
+
+        <ul>
+          <li>Do not scroll the entire page.</li>
+          <li>Scroll only #isi-container.</li>
+          <li>Capture the complete 300 x 250 banner frame.</li>
+          <li>Preserve the header and body in every frame.</li>
+        </ul>
+
+        <h3>Additional Test Section 01</h3>
+
+        <p>
+          Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer
+          feugiat, mauris sed tincidunt vulputate, justo ipsum aliquet arcu,
+          vitae consequat neque lorem non nisl.
+        </p>
+
+        <p>
+          Suspendisse potenti. Donec posuere, velit in consequat tristique,
+          libero ipsum malesuada justo, vitae tincidunt lorem sapien sed arcu.
+        </p>
+
+        <h3>Additional Test Section 02</h3>
+
+        <p>
+          This section exists only to increase the amount of scrollable content.
+          It allows the screenshot automation system to generate several
+          screenshots and verify coverage.
+        </p>
+
+        <p>
+          Curabitur vitae ligula euismod, faucibus justo non, consequat nibh.
+          Sed non eros vel lacus tincidunt tincidunt.
+        </p>
+
+        <h3>Additional Test Section 03</h3>
+
+        <p>
+          More artificial content for testing nested scrolling. The automation
+          tool should not assume a fixed number of screenshots.
+        </p>
+
+        <p>
+          The number of frames should be calculated from scrollHeight and
+          clientHeight, with configurable overlap between frames.
+        </p>
+
+        <div class="warning">
+          FINAL TEST WARNING — CONTENT CONTINUES BELOW.
+        </div>
+
+        <h3>Additional Test Section 04</h3>
+
+        <p>
+          This is another intentionally long paragraph used to ensure the final
+          screenshot does not stop before the end of the ISI content.
+        </p>
+
+        <p>
+          The final generated frame should reach the maximum valid scrollTop
+          position of the nested ISI container.
+        </p>
+
+        <h3>Additional Test Section 05</h3>
+
+        <p>
+          Final block of artificial content. The coverage validator should
+          confirm that there is no uncovered ISI range between screenshot
+          frames.
+        </p>
+
+        <p>
+          End of fake Important Safety Information content.
+        </p>
+
+        <div class="end-marker">
+          END OF TEST ISI CONTENT
+        </div>
+
+      </div>
+    </section>
+
+  </div>
+
+</body>
+</html>
