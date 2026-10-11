@@ -68,4 +68,100 @@ describe('Puppeteer Banner Automation Integration Test', () => {
     await loaded.page.close();
     await loaded.context.close();
   }, 30000); // 30s timeout
+
+  it('should validate and capture US-110097 Studio banner with third-party ad loader', async () => {
+    const bannerPath = path.resolve(process.cwd(), './US-110097-300x250');
+    if (!existsSync(bannerPath)) return;
+
+    const jobId = `test_us110097_${Date.now()}`;
+    const tempDir = await createJobTempDir(jobId);
+    const { jobOutputDir, screenshotsDir } = await createJobOutputDir(jobId);
+
+    // 1. Load from directory input
+    const { loadInputSource } = await import('../../src/input/html-loader.js');
+    const loadResult = await loadInputSource(bannerPath, tempDir);
+    expect(existsSync(loadResult.primaryHtmlFile)).toBe(true);
+
+    const loaded = await createAndLoadPage(loadResult.primaryHtmlFile, {
+      width: 300,
+      height: 250,
+      deviceScaleFactor: 2
+    });
+
+    await waitForRenderingStability(loaded.page);
+
+    // 2. Section detection should detect #wrapper and #viewport
+    const sectionData = await detectBannerSections(loaded.page, {
+      rootSelector: '#wrapper',
+      isiSelector: '#viewport'
+    });
+
+    expect(sectionData.root.selector).toBe('#wrapper');
+    expect(sectionData.root.box.width).toBe(300);
+    expect(sectionData.root.box.height).toBe(250);
+    expect(sectionData.isi.selector).toBe('#viewport');
+    expect(sectionData.isi.isScrollable).toBe(true);
+
+    // 3. Validation should pass
+    const validation = await runValidationRules(loaded.page, loadResult.primaryHtmlFile, sectionData, {
+      expectedWidth: 300,
+      expectedHeight: 250
+    });
+
+    expect(validation.overallStatus).toBe('passed');
+
+    await loaded.page.close();
+    await loaded.context.close();
+  }, 35000);
+
+  it('should auto-detect and capture dynamic grid banner out of the box with zero user selectors', async () => {
+    const fixturePath = path.resolve(process.cwd(), './fixtures/sample-banner-dynamic-300x250/index.html');
+    expect(existsSync(fixturePath)).toBe(true);
+
+    const jobId = `test_dynamic_${Date.now()}`;
+    const { screenshotsDir } = await createJobOutputDir(jobId);
+
+    const loaded = await createAndLoadPage(fixturePath, {
+      width: 300,
+      height: 250,
+      deviceScaleFactor: 2
+    });
+
+    await waitForRenderingStability(loaded.page);
+
+    // 1. Detect sections with ZERO user selectors (empty config)
+    const sectionData = await detectBannerSections(loaded.page, {});
+
+    expect(sectionData.root.selector).toBe('#ad-stage');
+    expect(sectionData.root.box.width).toBe(300);
+    expect(sectionData.root.box.height).toBe(250);
+    expect(sectionData.isi.selector).toBe('#safety-scroll-pane');
+    expect(sectionData.isi.isScrollable).toBe(true);
+
+    // Verify fixed regions detected (header, body, footer)
+    expect(sectionData.fixedRegions.length).toBeGreaterThanOrEqual(2);
+
+    // 2. Validate rules
+    const validation = await runValidationRules(loaded.page, fixturePath, sectionData, {
+      expectedWidth: 300,
+      expectedHeight: 250
+    });
+
+    expect(validation.overallStatus).toBe('passed');
+
+    // 3. Capture nested ISI scroll frames
+    const scrollResult = await executeNestedScrollCapture(
+      loaded.page,
+      sectionData,
+      screenshotsDir,
+      { overlap: 10, jobId }
+    );
+
+    expect(scrollResult.totalScreenshots).toBeGreaterThan(1);
+    expect(scrollResult.coverage.status).toBe('passed');
+    expect(existsSync(scrollResult.screenshots[0].filePath)).toBe(true);
+
+    await loaded.page.close();
+    await loaded.context.close();
+  }, 35000);
 });

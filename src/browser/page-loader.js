@@ -30,6 +30,20 @@ export async function createAndLoadPage(htmlFilePath, options = {}) {
       deviceScaleFactor: deviceScaleFactor
     });
 
+    // Hook & expedite third-party ad loaders (e.g. DoubleClick Studio Enabler.js)
+    await page.evaluateOnNewDocument(() => {
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          if (typeof window.pageLoadedHandler === 'function') {
+            const wrap = document.getElementById('wrapper');
+            if (!wrap || window.getComputedStyle(wrap).display === 'none') {
+              window.pageLoadedHandler();
+            }
+          }
+        }, 50);
+      });
+    });
+
     logger.info(`Loading page: ${fileUrl} [Viewport: ${width}x${height} @ scale ${deviceScaleFactor}]`);
 
     await page.goto(fileUrl, {

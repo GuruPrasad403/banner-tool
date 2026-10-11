@@ -15,6 +15,35 @@ export async function loadInputSource(inputPath, workDir, originalName = null) {
     throw new ValidationError(`Input path does not exist: ${inputPath}`, { inputPath }, 'Provide a valid local path to an HTML file or ZIP archive.');
   }
 
+  const stat = await fs.stat(inputPath);
+
+  // 1. Directory Input: scan for primary HTML and copy contents
+  if (stat.isDirectory()) {
+    logger.info(`Processing Directory input: ${inputPath}`);
+    await ensureDir(workDir);
+
+    const htmlFiles = await findHtmlFilesRecursive(inputPath);
+    if (htmlFiles.length === 0) {
+      throw new ValidationError(`No HTML entry file found in directory: ${inputPath}`);
+    }
+
+    // Prioritize index.html
+    const primarySrc = htmlFiles.find(f => path.basename(f).toLowerCase() === 'index.html') || htmlFiles[0];
+    const baseSourceDir = path.dirname(primarySrc);
+
+    // Copy directory containing the primary HTML file
+    await copyDirectoryContents(baseSourceDir, workDir);
+
+    const destHtml = path.join(workDir, path.basename(primarySrc));
+    const copiedFiles = await fs.readdir(workDir);
+
+    return {
+      primaryHtmlFile: destHtml,
+      htmlFiles: [destHtml],
+      allFilesCount: copiedFiles.length
+    };
+  }
+
   const targetName = originalName || inputPath;
   const ext = path.extname(targetName).toLowerCase();
 
@@ -30,21 +59,42 @@ export async function loadInputSource(inputPath, workDir, originalName = null) {
     const filename = originalName ? path.basename(originalName) : path.basename(inputPath);
     const destPath = path.join(workDir, filename);
 
-    const stat = await fs.stat(inputPath);
-    if (stat.isDirectory()) {
-      await copyDirectoryContents(inputPath, workDir);
+    // If local HTML file on disk (not uploaded to temp uploads), copy sibling assets from its parent directory
+    const isTempUpload = inputPath.includes(path.join('temp', 'uploads')) || inputPath.includes('temp/uploads');
+    if (!isTempUpload) {
+      const parentDir = path.dirname(inputPath);
+      await copyDirectoryContents(parentDir, workDir);
     } else {
       await fs.copyFile(inputPath, destPath);
     }
 
+    const copiedFiles = await fs.readdir(workDir);
+
     return {
       primaryHtmlFile: destPath,
       htmlFiles: [destPath],
-      allFilesCount: 1
+      allFilesCount: copiedFiles.length
     };
   }
 
   throw new ValidationError(`Unsupported file extension: "${ext}". Expected .html, .htm, or .zip.`);
+}
+
+/**
+ * Recursively finds all HTML files in a directory
+ */
+async function findHtmlFilesRecursive(dir) {
+  const results = [];
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results.push(...(await findHtmlFilesRecursive(full)));
+    } else if (['.html', '.htm'].includes(path.extname(entry.name).toLowerCase())) {
+      results.push(full);
+    }
+  }
+  return results;
 }
 
 /**

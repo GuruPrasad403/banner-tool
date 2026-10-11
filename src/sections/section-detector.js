@@ -52,6 +52,27 @@ export async function detectBannerSections(page, userConfig = {}) {
       }
 
       if (!rootEl) {
+        // Priority 3.5: Dimension match heuristic (elements matching standard banner dimensions)
+        const candidates = Array.from(document.querySelectorAll('div, section, main, article, [id]'));
+        for (const el of candidates) {
+          if (el === document.documentElement || el === document.body) continue;
+          const rect = el.getBoundingClientRect();
+          if (rect.width >= 100 && rect.height >= 50) {
+            // Check against known profiles or 300x250
+            if ((Math.abs(rect.width - 300) <= 3 && Math.abs(rect.height - 250) <= 3) ||
+                (Math.abs(rect.width - 320) <= 3 && Math.abs(rect.height - 480) <= 3) ||
+                (Math.abs(rect.width - 728) <= 3 && Math.abs(rect.height - 90) <= 3) ||
+                (Math.abs(rect.width - 300) <= 3 && Math.abs(rect.height - 600) <= 3)) {
+              rootEl = el;
+              rootReason = `Priority 3.5: Dimension match heuristic (${Math.round(rect.width)}x${Math.round(rect.height)})`;
+              rootConfidence = 90;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!rootEl) {
         rootEl = document.body;
         rootReason = 'Priority 4: Heuristic fallback (document.body)';
         rootConfidence = 50;
@@ -104,13 +125,15 @@ export async function detectBannerSections(page, userConfig = {}) {
         const overflowY = style.overflowY;
         const isScrollableStyle = overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay';
         const hasScrollableHeight = el.scrollHeight > el.clientHeight + 2;
+        const hasOverviewChild = Boolean(el.querySelector && el.querySelector('#overview, .overview'));
         const text = (el.innerText || el.textContent || '').toLowerCase();
         const hasIsiKeywords = text.includes('safety') || text.includes('isi') || text.includes('indication') || text.includes('prescribing');
 
-        if (isScrollableStyle || (hasScrollableHeight && el !== document.documentElement && el !== document.body)) {
+        if (isScrollableStyle || (hasScrollableHeight && (hasOverviewChild || el !== document.documentElement && el !== document.body))) {
           let score = 0;
           if (isScrollableStyle) score += 40;
           if (hasScrollableHeight) score += 40;
+          if (hasOverviewChild) score += 30;
           if (hasIsiKeywords) score += 20;
 
           const candidateSelector = generateCssSelector(el);
@@ -124,7 +147,7 @@ export async function detectBannerSections(page, userConfig = {}) {
             maxScrollTop: el.scrollHeight - el.clientHeight,
             isScrollable: el.scrollHeight > el.clientHeight,
             confidence: score,
-            reason: `Overflow: ${overflowY}, ScrollHeight: ${el.scrollHeight}px, ClientHeight: ${el.clientHeight}px`
+            reason: `Overflow: ${overflowY}, ScrollHeight: ${el.scrollHeight}px, ClientHeight: ${el.clientHeight}px${hasOverviewChild ? ', Has Overview Child' : ''}`
           });
         }
       }
@@ -198,6 +221,22 @@ export async function detectBannerSections(page, userConfig = {}) {
             fixedRegions.push({
               selector: sel,
               reason: `Detected body-copy selector (${sel})`,
+              box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+            });
+            break;
+          }
+        }
+      }
+
+      // Auto-detect footer if missing
+      if (defaultKnown.footer && !fixedRegions.some((f) => f.selector.includes('footer') || f.selector.includes('legal'))) {
+        for (const sel of defaultKnown.footer) {
+          const el = document.querySelector(sel);
+          if (el) {
+            const rect = el.getBoundingClientRect();
+            fixedRegions.push({
+              selector: sel,
+              reason: `Detected footer selector (${sel})`,
               box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
             });
             break;

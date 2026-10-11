@@ -102,6 +102,14 @@ export default function App() {
           detectionData: data.detectionData,
           validationReport: data.validationReport
         }));
+
+        if (data.detectionData) {
+          setConfig((prev) => ({
+            ...prev,
+            rootSelector: data.detectionData.root?.selector || prev.rootSelector,
+            isiSelector: data.detectionData.isi?.selector || prev.isiSelector
+          }));
+        }
       }
     } catch (err) {
       console.error('Error validating job:', err);

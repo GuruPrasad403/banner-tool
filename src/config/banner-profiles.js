@@ -1,4 +1,17 @@
 export const defaultBannerProfiles = {
+  "us-110097-300x250": {
+    id: "us-110097-300x250",
+    name: "US-110097 Studio Banner (300x250)",
+    width: 300,
+    height: 250,
+    widthTolerance: 0,
+    heightTolerance: 0,
+    rootSelector: "#wrapper",
+    fixedSelectors: ["#logo", "#piBg", "#piText"],
+    isiSelector: "#viewport",
+    deviceScaleFactor: 2,
+    overlap: 10
+  },
   "mobile-small": {
     id: "mobile-small",
     name: "Mobile Small (300x250)",

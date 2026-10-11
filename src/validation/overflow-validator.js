@@ -5,9 +5,12 @@ export async function validateHorizontalOverflow(page, rootSelector) {
     const bodyClientWidth = document.body.clientWidth;
     const rootScrollWidth = root.scrollWidth;
     const rootClientWidth = root.clientWidth;
+    const rootOffsetWidth = root.offsetWidth || rootClientWidth;
+    const rootOverflowX = window.getComputedStyle(root).overflowX;
 
-    const hasPageOverflow = bodyScrollWidth > bodyClientWidth;
-    const hasRootOverflow = rootScrollWidth > rootClientWidth;
+    const hasPageOverflow = bodyScrollWidth > bodyClientWidth + 1;
+    // Allow for borders (offsetWidth) and subpixel rounding (1px tolerance)
+    const hasRootOverflow = !['hidden', 'clip'].includes(rootOverflowX) && (rootScrollWidth > Math.max(rootClientWidth, rootOffsetWidth) + 1);
 
     return {
       hasPageOverflow,
@@ -15,7 +18,8 @@ export async function validateHorizontalOverflow(page, rootSelector) {
       bodyScrollWidth,
       bodyClientWidth,
       rootScrollWidth,
-      rootClientWidth
+      rootClientWidth,
+      rootOffsetWidth
     };
   }, rootSelector);
 

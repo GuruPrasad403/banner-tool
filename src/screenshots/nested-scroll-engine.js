@@ -29,11 +29,14 @@ export async function executeNestedScrollCapture(page, sectionData, screenshotsO
   let initialIsiMetrics = await page.evaluate((selector) => {
     const el = document.querySelector(selector);
     if (!el) return null;
+    const overview = el.querySelector('#overview, .overview');
+    const scrollHeight = overview ? Math.max(el.scrollHeight || 0, overview.scrollHeight || overview.offsetHeight || 0) : (el.scrollHeight || 250);
+    const clientHeight = el.clientHeight || 250;
     return {
       scrollTop: el.scrollTop || 0,
-      clientHeight: el.clientHeight || 250,
-      scrollHeight: el.scrollHeight || 250,
-      maxScrollTop: Math.max(0, (el.scrollHeight || 250) - (el.clientHeight || 250))
+      clientHeight,
+      scrollHeight,
+      maxScrollTop: Math.max(0, scrollHeight - clientHeight)
     };
   }, isiSelector);
 
@@ -64,10 +67,38 @@ export async function executeNestedScrollCapture(page, sectionData, screenshotsO
         const el = document.querySelector(selector);
         if (!el) throw new Error(`Scroll target element not found: ${selector}`);
 
-        el.scrollTop = targetTop;
+        let isCustomScrollbar = false;
+
+        // Support TinyScrollbar if present
+        if (typeof window.jQuery !== 'undefined') {
+          const $ = window.jQuery;
+          const candidates = ['#footer_content_main', '#scrollbar1', selector, el.parentElement];
+          for (const cand of candidates) {
+            try {
+              const $c = $(cand);
+              if ($c.length && $c.data('tsb')) {
+                $c.tinyscrollbar_update(targetTop);
+                isCustomScrollbar = true;
+                break;
+              }
+            } catch (e) {}
+          }
+        }
+
+        const overview = el.querySelector('#overview, .overview') || (el.id === 'overview' ? el : null);
+        if (overview && overview !== el) {
+          overview.style.top = `-${targetTop}px`;
+          isCustomScrollbar = true;
+        }
+
+        if (!isCustomScrollbar) {
+          el.scrollTop = targetTop;
+        }
+
+        const effectiveScrollTop = targetTop;
 
         return {
-          scrollTop: el.scrollTop,
+          scrollTop: effectiveScrollTop,
           clientHeight: el.clientHeight,
           scrollHeight: el.scrollHeight,
           maxScrollTop: Math.max(0, el.scrollHeight - el.clientHeight)

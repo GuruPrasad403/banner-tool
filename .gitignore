@@ -20,9 +20,14 @@ pnpm-debug.log*
 /coverage/
 /test-results/
 
+# Build output
+/dist/
+/build/
+
 # Operating system and editor files
 .DS_Store
 Thumbs.db
 Desktop.ini
 .vscode/
 .idea/
+

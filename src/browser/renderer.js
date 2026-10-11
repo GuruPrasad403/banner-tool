@@ -12,6 +12,39 @@ export async function waitForRenderingStability(page, options = {}) {
   } = options;
 
   try {
+    // 0. Ensure third-party ad loaders (e.g. Enabler.js / pageLoadedHandler) have triggered
+    await page.evaluate(() => {
+      try {
+        if (typeof window.pageLoadedHandler === 'function') {
+          const wrap = document.getElementById('wrapper');
+          if (!wrap || window.getComputedStyle(wrap).display === 'none') {
+            window.pageLoadedHandler();
+          }
+        }
+        if (typeof window.Enabler !== 'undefined') {
+          if (window.studio && window.studio.events && window.studio.events.StudioEvent) {
+            try {
+              window.Enabler.dispatchEvent(window.studio.events.StudioEvent.PAGE_LOADED);
+            } catch (e) {}
+          }
+        }
+      } catch (e) {
+        // Ignore if error during trigger
+      }
+    });
+
+    // Wait briefly if root banner (e.g. #wrapper, #banner) is hidden or transitioning
+    await page.evaluate(async (maxWaitMs) => {
+      const start = Date.now();
+      while (Date.now() - start < maxWaitMs) {
+        const wrap = document.getElementById('wrapper') || document.getElementById('banner');
+        if (wrap && window.getComputedStyle(wrap).display !== 'none') {
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    }, 1500);
+
     // 1. Wait for document.fonts.ready
     await page.evaluate(async (timeoutMs) => {
       if (document.fonts && document.fonts.ready) {

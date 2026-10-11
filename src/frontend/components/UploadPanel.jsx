@@ -129,7 +129,21 @@ export default function UploadPanel({ onJobCreated, isProcessing }) {
                 className="w-full bg-gray-950 border border-gray-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-gray-200 focus:outline-none focus:border-sky-500 font-mono"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setLocalPath('./US-110097-300x250/US-110097-300x250/index.html')}
+                className="text-[11px] px-2.5 py-1 bg-sky-950/60 hover:bg-sky-900/80 text-sky-300 rounded font-mono border border-sky-800/60 font-semibold"
+              >
+                ★ US-110097 (300x250)
+              </button>
+              <button
+                type="button"
+                onClick={() => setLocalPath('./fixtures/sample-banner-dynamic-300x250/index.html')}
+                className="text-[11px] px-2.5 py-1 bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 rounded font-mono border border-indigo-800/60 font-semibold"
+              >
+                ★ Nexicor Dynamic (300x250)
+              </button>
               <button
                 type="button"
                 onClick={() => setLocalPath('./fixtures/sample-banner-300x250/index.html')}

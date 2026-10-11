@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Banner Tool | Setup & First Run Guide</title>
+  <style>
+    @page { size: A4; margin: 16mm 17mm 17mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #1c2738;
+      font: 10pt/1.5 "Segoe UI", Arial, sans-serif;
+      background: #fff;
+    }
+    header {
+      padding: 22px 25px 20px;
+      color: white;
+      background: #101d35;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+    .eyebrow {
+      color: #8ac7ff;
+      text-transform: uppercase;
+      font-size: 8pt;
+      letter-spacing: 1.3px;
+      font-weight: 700;
+    }
+    h1 { font-size: 25pt; line-height: 1.12; margin: 8px 0; }
+    header p { color: #d6e0ee; margin: 6px 0 0; font-size: 10pt; }
+    h2 {
+      font-size: 14pt;
+      margin: 20px 0 8px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid #dbe3ee;
+      color: #12294b;
+    }
+    h3 { margin: 11px 0 4px; font-size: 10.5pt; color: #18365e; }
+    p { margin: 5px 0 8px; }
+    ul, ol { margin: 5px 0 9px; padding-left: 21px; }
+    li { margin: 3px 0; }
+    code {
+      font: 9pt Consolas, "Courier New", monospace;
+      background: #eef3f9;
+      color: #18365e;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+    pre {
+      white-space: pre-wrap;
+      margin: 6px 0 9px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      background: #111c2e;
+      color: #e7f0ff;
+      font: 9pt/1.5 Consolas, "Courier New", monospace;
+    }
+    .note, .tip, .warning {
+      padding: 9px 12px;
+      margin: 9px 0;
+      border-radius: 6px;
+    }
+    .note { background: #edf5ff; border-left: 3px solid #3983d4; }
+    .tip { background: #edf8f1; border-left: 3px solid #39a36a; }
+    .warning { background: #fff6e8; border-left: 3px solid #e6a23c; }
+    table { border-collapse: collapse; width: 100%; margin: 7px 0 10px; }
+    th, td {
+      text-align: left;
+      vertical-align: top;
+      border: 1px solid #dbe3ee;
+      padding: 6px 8px;
+    }
+    th { background: #eef3f9; color: #18365e; }
+    .small { font-size: 8.5pt; color: #536176; }
+    .page-break { break-before: page; }
+    a { color: #1769aa; text-decoration: none; }
+    footer {
+      margin-top: 22px;
+      padding-top: 8px;
+      border-top: 1px solid #dbe3ee;
+      color: #718096;
+      font-size: 8pt;
+    }
+    .pill {
+      display: inline-block;
+      padding: 3px 8px;
+      margin: 2px 3px 2px 0;
+      border-radius: 20px;
+      background: #eaf2fc;
+      color: #244c7e;
+      font-size: 8.5pt;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">Quick start · Windows</div>
+    <h1>Banner Validator &amp;<br>Screenshot Tool</h1>
+    <p>Clone or download the project, install its runtime requirements, and run your first banner check.</p>
+  </header>
+
+  <p><strong>Repository:</strong> <a href="https://github.com/GuruPrasad403/banner-tool">github.com/GuruPrasad403/banner-tool</a></p>
+  <p>This local tool checks HTML banner dimensions and key sections, then captures the banner while scrolling through its Important Safety Information (ISI) content.</p>
+
+  <h2>1. What you need</h2>
+  <table>
+    <tr><th>Requirement</th><th>Details</th></tr>
+    <tr><td>Operating system</td><td>Windows 10 or later recommended.</td></tr>
+    <tr><td>Node.js</td><td>Version 18 or later; use a current LTS release (Node.js 20 or 22 recommended). npm is included with Node.js.</td></tr>
+    <tr><td>Git (optional)</td><td>Needed only if using the clone command. Alternatively, download the repository as a ZIP from GitHub.</td></tr>
+    <tr><td>Browser</td><td>Current Chrome or Microsoft Edge to use the dashboard.</td></tr>
+    <tr><td>Internet</td><td>Needed to clone/download the project and install npm packages. Puppeteer may download its browser on the first install.</td></tr>
+    <tr><td>Local ports</td><td>Ports 3000 and 3001 must be available while the app is running.</td></tr>
+  </table>
+  <p>After installing Node.js, open PowerShell or Command Prompt and confirm:</p>
+  <pre>node --version
+npm --version</pre>
+  <p class="small">The Node version should be v18 or higher. If Windows cannot find <code>node</code> or <code>npm</code>, reopen the terminal after installing Node.js.</p>
+
+  <h2>2. Get the project</h2>
+  <h3>Option A — Clone with Git</h3>
+  <p>Open PowerShell or Command Prompt in the folder where you want the project, then run:</p>
+  <pre>git clone https://github.com/GuruPrasad403/banner-tool.git
+cd banner-tool</pre>
+  <h3>Option B — Download from GitHub</h3>
+  <ol>
+    <li>Open the repository link above.</li>
+    <li>Select <strong>Code → Download ZIP</strong>.</li>
+    <li>Extract the ZIP file, then open a terminal in the extracted <code>banner-tool</code> folder.</li>
+  </ol>
+  <p class="note"><strong>Tip:</strong> In File Explorer, open the project folder, click the address bar, type <code>powershell</code>, and press Enter to open a terminal in that folder.</p>
+
+  <h2>3. Install and start the application</h2>
+  <ol>
+    <li>From the project folder, install the project packages:</li>
+  </ol>
+  <pre>npm install</pre>
+  <ol start="2">
+    <li>Start the UI and its local backend together:</li>
+  </ol>
+  <pre>npm run dev</pre>
+  <ol start="3">
+    <li>Wait for the startup messages, then open <a href="http://localhost:3000">http://localhost:3000</a> in Chrome or Edge.</li>
+  </ol>
+  <p class="note"><strong>Keep the terminal open</strong> while testing. To stop the app, return to the terminal and press <code>Ctrl+C</code>.</p>
+
+  <h2>4. Run a banner check</h2>
+  <h3>A. Choose the input file</h3>
+  <p>In <strong>Upload or Select Banner Input</strong>, either upload one <code>.html</code>/<code>.htm</code> file or upload a <code>.zip</code> package containing the HTML and its local CSS, JavaScript, images, and other assets. Keep the asset folder structure intact inside the ZIP.</p>
+  <p>For a quick check without preparing a banner, use <strong>Local Path / Fixtures</strong> and select one of the built-in sample buttons.</p>
+  <h3>B. Select a size profile</h3>
+  <table>
+    <tr><th>Profile</th><th>Expected size</th></tr>
+    <tr><td>Mobile Small</td><td>300 × 250 px</td></tr>
+    <tr><td>Mobile Large</td><td>320 × 480 px</td></tr>
+    <tr><td>Leaderboard</td><td>728 × 90 px</td></tr>
+    <tr><td>Half Page</td><td>300 × 600 px</td></tr>
+    <tr><td>Custom Dimensions</td><td>Enter the required width and height manually.</td></tr>
+  </table>
+  <p>Confirm <strong>Expected Width</strong> and <strong>Expected Height</strong> match the banner specification. These are CSS pixels.</p>
+
+  <h3>C. Check or update the section selectors</h3>
+  <table>
+    <tr><th>UI field</th><th>What to enter</th><th>Example</th></tr>
+    <tr><td>Root Banner Selector</td><td>HTML ID or class for the complete banner frame.</td><td><code>#banner</code></td></tr>
+    <tr><td>Fixed Section Selectors</td><td>Header/body IDs or classes, comma-separated.</td><td><code>#header, #body-copy</code></td></tr>
+    <tr><td>Nested Scrollable ISI Selector</td><td>ID or class for the scrollable ISI area.</td><td><code>#isi-container</code></td></tr>
+  </table>
+  <p>These example selectors are prefilled defaults. If the supplied HTML uses different IDs/classes, change the values to match it. Standard CSS selector notation applies: prefix an ID with <code>#</code> and a class with <code>.</code>.</p>
+  <div class="warning"><strong>Banner ID:</strong> There is no separate Banner ID input in the current UI. The uploaded file name identifies the job in the tool; it is not necessary to invent or enter a banner ID.</div>
+
+  <h3>D. Image and scroll options</h3>
+  <ul>
+    <li><strong>Device Scale Factor:</strong> 2x is the default and gives sharper screenshots; 1x or 3x can be chosen if needed.</li>
+    <li><strong>Scroll Overlap:</strong> The number of pixels repeated between adjacent ISI screenshots. The profile default is usually fine.</li>
+  </ul>
+
+  <h3>E. Validate and capture</h3>
+  <ol>
+    <li>Click <strong>Initialize Job &amp; Selectors</strong> to load the banner and inspect its sections.</li>
+    <li>Review the detected banner, header/body, and ISI areas and the validation report.</li>
+    <li>Click <strong>Validate &amp; Capture Screenshots</strong> to validate and automatically capture the banner while scrolling the ISI area.</li>
+    <li>Review the generated screenshot gallery and validation report in the dashboard.</li>
+  </ol>
+  <p>Output files are created locally in the project’s <code>output</code> folder. Temporary processing files are placed in <code>temp</code>. These generated folders are excluded from Git.</p>
+
+  <h2>5. Common setup issues</h2>
+  <table>
+    <tr><th>Issue</th><th>What to try</th></tr>
+    <tr><td><code>node</code> or <code>npm</code> is not recognized</td><td>Install Node.js 18+, close and reopen the terminal, and check the version commands again.</td></tr>
+    <tr><td><code>npm install</code> fails or stalls</td><td>Confirm internet access, then rerun <code>npm install</code>. The initial install may take time to fetch dependencies and Puppeteer’s browser.</td></tr>
+    <tr><td>Port 3000 or 3001 is already in use</td><td>Close the other application using that port, then stop and restart this tool with <code>npm run dev</code>.</td></tr>
+    <tr><td>Sections are not detected</td><td>Check that the selector values exactly match the IDs/classes in the HTML. Include <code>#</code> for an ID or <code>.</code> for a class.</td></tr>
+    <tr><td>Images or styles are missing</td><td>Upload a ZIP containing the HTML and its related local assets, preserving their folder paths.</td></tr>
+  </table>
+
+  <h2>Quick reference</h2>
+  <p><span class="pill">Node.js 18+</span><span class="pill">npm install</span><span class="pill">npm run dev</span><span class="pill">localhost:3000</span></p>
+  <p class="small">Repository: <a href="https://github.com/GuruPrasad403/banner-tool">https://github.com/GuruPrasad403/banner-tool</a></p>
+  <footer>Banner Validator &amp; Screenshot Tool · Local development setup guide</footer>
+</body>
+</html>
