@@ -3,24 +3,37 @@
 # dashboard from dist/ (see the production block in src/server.js).
 FROM node:22-bookworm-slim
 
-# System libraries required by the Chromium build that Puppeteer downloads
+# Complete Chromium runtime dependency set for Debian bookworm, following
+# Puppeteer's official Docker recipe. An incomplete list previously shipped
+# and Chrome failed to start on Render with "error while loading shared
+# libraries: libpango-1.0.so.0" — no validation or screenshots were possible.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     fonts-liberation \
     libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
+    libatspi2.0-0 \
+    libcairo2 \
     libcups2 \
+    libdbus-1-3 \
     libdrm2 \
+    libexpat1 \
+    libfontconfig1 \
     libgbm1 \
+    libglib2.0-0 \
     libnspr4 \
     libnss3 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libx11-6 \
+    libxcb1 \
     libxcomposite1 \
     libxdamage1 \
+    libxext6 \
     libxfixes3 \
     libxkbcommon0 \
     libxrandr2 \
-    wget \
     xdg-utils \
   && rm -rf /var/lib/apt/lists/*
 

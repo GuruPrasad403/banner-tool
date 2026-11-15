@@ -10,6 +10,13 @@ import { executeNestedScrollCapture } from '../../src/screenshots/nested-scroll-
 import { closeBrowserInstance } from '../../src/browser/browser-manager.js';
 import { createJobOutputDir, createJobTempDir } from '../../src/utils/paths.js';
 
+// The US-110097 banner folder held client material that the repo owner
+// deliberately removed from the repository (commit 998ba7f, 11 Oct 2026).
+// It must NOT be restored; the US-110097 test below is skipped whenever the
+// folder is absent and only runs where the folder exists locally.
+const us110097BannerPath = path.resolve(process.cwd(), './US-110097-300x250');
+const us110097BannerExists = existsSync(us110097BannerPath);
+
 describe('Puppeteer Banner Automation Integration Test', () => {
   afterAll(async () => {
     await closeBrowserInstance();
@@ -69,9 +76,10 @@ describe('Puppeteer Banner Automation Integration Test', () => {
     await loaded.context.close();
   }, 30000); // 30s timeout
 
-  it('should validate and capture US-110097 Studio banner with third-party ad loader', async () => {
-    const bannerPath = path.resolve(process.cwd(), './US-110097-300x250');
-    if (!existsSync(bannerPath)) return;
+  // Skipped when the US-110097 folder is absent (see note at the top of this
+  // file: the folder held client material the owner removed from the repo).
+  it.skipIf(!us110097BannerExists)('should validate and capture US-110097 Studio banner with third-party ad loader', async () => {
+    const bannerPath = us110097BannerPath;
 
     const jobId = `test_us110097_${Date.now()}`;
     const tempDir = await createJobTempDir(jobId);

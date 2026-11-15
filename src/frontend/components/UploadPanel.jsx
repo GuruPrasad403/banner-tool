@@ -146,6 +146,13 @@ export default function UploadPanel({ onJobCreated, isProcessing }) {
               </button>
               <button
                 type="button"
+                onClick={() => setLocalPath('./fixtures/animated-slides-banner/index.html')}
+                className="text-[11px] px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded font-mono border border-gray-700"
+              >
+                Animated Slides 300x250 (Slides-First)
+              </button>
+              <button
+                type="button"
                 onClick={() => setLocalPath('./fixtures/sample-banner-invalid/index.html')}
                 className="text-[11px] px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded font-mono border border-gray-700"
               >
