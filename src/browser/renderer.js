@@ -8,8 +8,11 @@ export async function waitForRenderingStability(page, options = {}) {
   const {
     fontsTimeout = DEFAULT_CONFIG.defaultTimeouts.fontsReady,
     settleDelay = DEFAULT_CONFIG.defaultTimeouts.renderSettle,
+    animationDelay = DEFAULT_CONFIG.defaultTimeouts.animationDelay,
     pauseAnimations = false
   } = options;
+
+  let animationDelayApplied = 0;
 
   try {
     // 0. Ensure third-party ad loaders (e.g. Enabler.js / pageLoadedHandler) have triggered
@@ -83,7 +86,23 @@ export async function waitForRenderingStability(page, options = {}) {
     if (settleDelay > 0) {
       await new Promise((resolve) => setTimeout(resolve, settleDelay));
     }
+
+    // 5. Animation delay: give animated banners time to play/finish their
+    // animation before the first screenshot is taken, so frames are not
+    // captured mid-animation (the fixed render settle alone is too short for
+    // banners with multi-second entrance animations). Applied once per page
+    // load, not per scroll step (scrollSettle covers scroll steps).
+    const delayMs = Number(animationDelay);
+    if (Number.isFinite(delayMs) && delayMs > 0) {
+      const waitStart = Date.now();
+      logger.info(`Waiting ${delayMs}ms animation delay for banner animation to complete before capture...`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      animationDelayApplied = Date.now() - waitStart;
+      logger.info(`Animation delay completed: waited ${animationDelayApplied}ms.`);
+    }
   } catch (err) {
     logger.warn('Warning during rendering stability wait:', err.message);
   }
+
+  return { animationDelayApplied };
 }

@@ -1,0 +1,14 @@
+# Render Blueprint — deploys the Banner Validator & Screenshot Tool as a
+# single Docker web service (Express API + Puppeteer + built dashboard).
+# Free tier note: the service sleeps after inactivity, so the first request
+# after idle is slow; the filesystem is ephemeral, so uploaded/output files
+# do not persist across restarts.
+services:
+  - type: web
+    name: banner-tool
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production

@@ -138,6 +138,9 @@ app.post('/api/jobs', (req, res, next) => {
         heightTolerance: Number(req.body.heightTolerance) || 0,
         deviceScaleFactor: Number(req.body.deviceScaleFactor) || 2,
         overlap: Number(req.body.overlap) || 10,
+        animationDelay: (req.body.animationDelay !== undefined && req.body.animationDelay !== '' && !Number.isNaN(Number(req.body.animationDelay)))
+          ? Math.max(0, Number(req.body.animationDelay))
+          : DEFAULT_CONFIG.defaultTimeouts.animationDelay,
         rootSelector: req.body.rootSelector || null,
         fixedSelectors: req.body.fixedSelectors ? (Array.isArray(req.body.fixedSelectors) ? req.body.fixedSelectors : [req.body.fixedSelectors]) : [],
         isiSelector: req.body.isiSelector || null
@@ -182,7 +185,7 @@ app.post('/api/jobs/:jobId/validate', async (req, res, next) => {
       deviceScaleFactor: job.config.deviceScaleFactor
     });
 
-    await waitForRenderingStability(loaded.page);
+    await waitForRenderingStability(loaded.page, { animationDelay: job.config.animationDelay });
 
     // Section detection
     const sectionData = await detectBannerSections(loaded.page, {
@@ -233,7 +236,7 @@ app.post('/api/jobs/:jobId/capture', async (req, res, next) => {
       deviceScaleFactor: job.config.deviceScaleFactor
     });
 
-    await waitForRenderingStability(loaded.page);
+    await waitForRenderingStability(loaded.page, { animationDelay: job.config.animationDelay });
 
     // Re-run section detection with updated config
     job.detectionData = await detectBannerSections(loaded.page, {
@@ -318,6 +321,25 @@ app.get('/api/jobs/:jobId/screenshots', (req, res) => {
   });
 });
 
+// --------------------------------------------------------------------------
+// PRODUCTION FRONTEND (single-service hosting, e.g. Render)
+// --------------------------------------------------------------------------
+// When a production build exists (dist/), serve the dashboard from this same
+// Express service alongside the API, with an SPA fallback so refreshing a
+// non-root route returns index.html instead of a 404. In local development
+// (no dist/ build) Vite serves the frontend on port 3000 and this block is
+// inactive, so dev behaviour is unchanged.
+const distDir = path.resolve(process.cwd(), './dist');
+if (existsSync(path.join(distDir, 'index.html'))) {
+  app.use(express.static(distDir));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/output')) {
+      return next();
+    }
+    res.sendFile(path.join(distDir, 'index.html'));
+  });
+}
+
 // Global Error Handler
 app.use((err, req, res, next) => {
   logger.error('API Error:', err);
@@ -330,7 +352,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-const PORT = DEFAULT_CONFIG.port;
+const PORT = process.env.PORT || DEFAULT_CONFIG.port;
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
     logger.info(`Express API Server listening on http://localhost:${PORT}`);

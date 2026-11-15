@@ -25,6 +25,7 @@ export default function App() {
     expectedHeight: 250,
     deviceScaleFactor: 2,
     overlap: 10,
+    animationDelay: 2000,
     rootSelector: '#banner',
     fixedSelectors: ['#header', '#body-copy'],
     isiSelector: '#isi-container'

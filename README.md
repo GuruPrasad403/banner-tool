@@ -82,8 +82,32 @@ npm run capture -- \
   --profile mobile-small \
   --output ./output \
   --scale 2 \
-  --overlap 10
+  --overlap 10 \
+  --animation-delay 2000
 ```
+
+---
+
+## Capture Options
+
+### Animation Delay (`animationDelay`)
+
+Animated banners need time to play or finish their entrance animation before
+being photographed; capturing at the fixed render-settle moment alone can
+catch them mid-animation. The **animation delay** is an extra wait (in
+milliseconds) applied once per job — after the page has loaded and rendering
+has settled, and before the first screenshot is taken. Scroll steps are not
+affected (they use the existing scroll-settle delay).
+
+- **Default:** `2000` ms (`DEFAULT_CONFIG.defaultTimeouts.animationDelay` in
+  `src/config/defaults.js`)
+- **Dashboard:** "Animation Delay (ms)" field next to Device Scale Factor /
+  Scroll Overlap
+- **REST API:** `animationDelay` in the job config (create-job form field or
+  the `config` object sent to the validate/capture endpoints)
+- **CLI:** `--animation-delay <ms>` on both `validate` and `capture`
+- Set to `0` to disable the extra wait. The value used for a job is recorded
+  in `screenshot-manifest.json` under `captureSettings.animationDelayMs`.
 
 ---
 

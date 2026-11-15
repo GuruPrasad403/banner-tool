@@ -39,7 +39,7 @@ export default function ConfigProfilesPanel({ profiles, selectedProfile, config,
       </div>
 
       {/* Dimension & Selector Inputs */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div>
           <label className="block text-xs font-medium text-gray-400 mb-1">Expected Width (CSS px)</label>
           <input
@@ -79,6 +79,18 @@ export default function ConfigProfilesPanel({ profiles, selectedProfile, config,
             type="number"
             value={config.overlap}
             onChange={(e) => onChangeConfig({ overlap: Number(e.target.value) })}
+            className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-sky-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-400 mb-1">Animation Delay (ms)</label>
+          <input
+            type="number"
+            min="0"
+            step="100"
+            value={config.animationDelay ?? 2000}
+            onChange={(e) => onChangeConfig({ animationDelay: Number(e.target.value) })}
             className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-sky-500"
           />
         </div>

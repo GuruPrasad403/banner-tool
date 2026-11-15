@@ -2,6 +2,7 @@
 import { Command } from 'commander';
 import path from 'node:path';
 import { defaultBannerProfiles } from './config/banner-profiles.js';
+import { DEFAULT_CONFIG } from './config/defaults.js';
 import { createJobTempDir, createJobOutputDir } from './utils/paths.js';
 import { loadInputSource } from './input/html-loader.js';
 import { createAndLoadPage } from './browser/page-loader.js';
@@ -14,6 +15,18 @@ import { createJsonReport } from './reports/json-report.js';
 import { createHtmlReport } from './reports/html-report.js';
 import { closeBrowserInstance } from './browser/browser-manager.js';
 import { logger } from './utils/logger.js';
+
+/**
+ * Parses an animation-delay CLI value (ms). Falls back to the configured
+ * default when the value is missing or invalid; 0 is valid (disables wait).
+ */
+function parseAnimationDelay(value) {
+  if (value === undefined || value === null || value === '') {
+    return DEFAULT_CONFIG.defaultTimeouts.animationDelay;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_CONFIG.defaultTimeouts.animationDelay;
+}
 
 const program = new Command();
 
@@ -35,6 +48,7 @@ program
   .option('-r, --root <selector>', 'CSS selector for root banner container')
   .option('-s, --isi <selector>', 'CSS selector for nested scrollable ISI container')
   .option('-f, --fixed <selectors>', 'Comma-separated fixed section selectors (e.g. #header,#body-copy)')
+  .option('--animation-delay <ms>', 'Animation delay in ms to wait for banner animation before validation', String(DEFAULT_CONFIG.defaultTimeouts.animationDelay))
   .action(async (options) => {
     let loaded = null;
     try {
@@ -44,6 +58,7 @@ program
       const rootSelector = options.root || profile.rootSelector;
       const isiSelector = options.isi || profile.isiSelector;
       const fixedSelectors = options.fixed ? options.fixed.split(',').map(s => s.trim()) : profile.fixedSelectors;
+      const animationDelay = parseAnimationDelay(options.animationDelay);
 
       const jobId = `cli_val_${Date.now()}`;
       const tempDir = await createJobTempDir(jobId);
@@ -57,7 +72,7 @@ program
         deviceScaleFactor: 2
       });
 
-      await waitForRenderingStability(loaded.page);
+      await waitForRenderingStability(loaded.page, { animationDelay });
 
       const sectionData = await detectBannerSections(loaded.page, {
         rootSelector,
@@ -117,6 +132,7 @@ program
   .option('-o, --output <dir>', 'Output directory path', './output')
   .option('--scale <scale>', 'Device scale factor', '2')
   .option('--overlap <pixels>', 'Scroll overlap in pixels', '10')
+  .option('--animation-delay <ms>', 'Animation delay in ms to wait for banner animation before capture', String(DEFAULT_CONFIG.defaultTimeouts.animationDelay))
   .action(async (options) => {
     let loaded = null;
     try {
@@ -128,6 +144,7 @@ program
       const fixedSelectors = options.fixed ? options.fixed.split(',').map(s => s.trim()) : profile.fixedSelectors;
       const deviceScaleFactor = Number(options.scale) || profile.deviceScaleFactor || 2;
       const overlap = Number(options.overlap) || profile.overlap || 10;
+      const animationDelay = parseAnimationDelay(options.animationDelay);
 
       const jobId = `cli_cap_${Date.now()}`;
       const tempDir = await createJobTempDir(jobId);
@@ -142,7 +159,7 @@ program
         deviceScaleFactor
       });
 
-      await waitForRenderingStability(loaded.page);
+      await waitForRenderingStability(loaded.page, { animationDelay });
 
       const sectionData = await detectBannerSections(loaded.page, {
         rootSelector,
@@ -166,7 +183,9 @@ program
         profile: options.profile,
         expectedWidth,
         expectedHeight,
-        deviceScaleFactor
+        deviceScaleFactor,
+        overlap,
+        animationDelay
       };
 
       const { report } = await createJsonReport(jobId, jobConfig, sectionData, validation, scrollResult, jobOutputDir);

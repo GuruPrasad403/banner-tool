@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { DEFAULT_CONFIG } from '../config/defaults.js';
 
 /**
  * Builds and writes screenshot-manifest.json to the output directory.
@@ -13,6 +14,10 @@ export async function createCaptureManifest(jobId, jobConfig, sectionData, scrol
       cssWidth: jobConfig.expectedWidth,
       cssHeight: jobConfig.expectedHeight,
       deviceScaleFactor: jobConfig.deviceScaleFactor || 2
+    },
+    captureSettings: {
+      animationDelayMs: jobConfig.animationDelay ?? DEFAULT_CONFIG.defaultTimeouts.animationDelay,
+      overlap: jobConfig.overlap ?? DEFAULT_CONFIG.defaultOverlap
     },
     selectors: {
       rootSelector: sectionData.root?.selector,
