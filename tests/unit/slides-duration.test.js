@@ -68,6 +68,74 @@ describe('Slides Duration Configuration (slides-first flow)', () => {
     expect(result.isiScrollTopSamples).toEqual([]);
   });
 
+  it('should default slidesMode to auto in DEFAULT_CONFIG', () => {
+    expect(DEFAULT_CONFIG.defaultTimeouts.slidesMode).toBe('auto');
+  });
+
+  it('should skip the flow in auto mode when no slide animations are detected', async () => {
+    const page = createFakePage();
+    const start = Date.now();
+    const result = await waitForRenderingStability(page, {
+      settleDelay: 0,
+      animationDelay: 0
+      // no slidesMode / slidesDuration: defaults apply (auto, 0)
+    });
+    const elapsed = Date.now() - start;
+
+    expect(result.slidesMode).toBe('auto');
+    expect(result.detectedCycleMs).toBe(0);
+    expect(result.slidesEffectiveWaitMs).toBe(0);
+    expect(result.slidesDurationApplied).toBe(0);
+    expect(result.slidesFreeze).toBeNull();
+    expect(elapsed).toBeLessThan(250);
+  });
+
+  it('should record slidesMode, detectedCycleMs and slidesWaitMs in the capture manifest', async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), 'manifest-test-'));
+    const jobConfig = {
+      profile: 'mobile-small',
+      expectedWidth: 300,
+      expectedHeight: 250,
+      deviceScaleFactor: 2,
+      overlap: 10,
+      animationDelay: 0,
+      slidesMode: 'auto',
+      slidesDuration: 0,
+      detectedCycleMs: 6000,
+      slidesWaitMs: 6001,
+      slidesFreeze: {
+        attempted: true,
+        isiFound: true,
+        isiSelector: '#isi-container',
+        animationsFound: 3,
+        animationsPaused: 3,
+        gsapFound: false,
+        gsapPaused: false,
+        warning: null
+      }
+    };
+    const sectionData = {
+      root: { selector: '#banner' },
+      fixedRegions: [{ selector: '#header' }],
+      isi: { selector: '#isi-container' }
+    };
+    const scrollResult = {
+      initialIsiMetrics: { scrollTop: 0, clientHeight: 90, scrollHeight: 600, maxScrollTop: 510 },
+      totalScreenshots: 1,
+      coverage: { status: 'passed' },
+      screenshots: []
+    };
+
+    const { manifest } = await createCaptureManifest('job_test_auto', jobConfig, sectionData, scrollResult, outputDir);
+
+    expect(manifest.captureSettings.slidesMode).toBe('auto');
+    expect(manifest.captureSettings.detectedCycleMs).toBe(6000);
+    expect(manifest.captureSettings.slidesWaitMs).toBe(6001);
+    expect(manifest.captureSettings.slidesDurationMs).toBe(0);
+
+    await fs.rm(outputDir, { recursive: true, force: true });
+  });
+
   it('should record slidesDurationMs and the freeze result in the capture manifest', async () => {
     const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), 'manifest-test-'));
     const jobConfig = {

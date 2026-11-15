@@ -29,6 +29,7 @@ export async function createJsonReport(jobId, jobConfig, sectionData, validation
     },
     validationSummary: validationResults.summary,
     rules: validationResults.rules,
+    slidesFlow: jobConfig.slidesFlow ?? null,
     scrollMetrics: scrollResult ? {
       isiSelector: scrollResult.isiSelector,
       metrics: scrollResult.initialIsiMetrics,

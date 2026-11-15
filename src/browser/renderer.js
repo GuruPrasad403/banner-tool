@@ -1,5 +1,6 @@
 import { DEFAULT_CONFIG } from '../config/defaults.js';
 import { logger } from '../utils/logger.js';
+import { computeSlideCycle, resolveSlidesMode, MAX_SLIDE_CYCLE_MS } from './slide-cycle.js';
 
 /**
  * Ensures browser page layout, fonts, images, and rendering have fully stabilized before screenshot or validation.
@@ -10,6 +11,7 @@ export async function waitForRenderingStability(page, options = {}) {
     settleDelay = DEFAULT_CONFIG.defaultTimeouts.renderSettle,
     animationDelay = DEFAULT_CONFIG.defaultTimeouts.animationDelay,
     slidesDuration = DEFAULT_CONFIG.defaultTimeouts.slidesDuration,
+    slidesMode = undefined,
     isiSelector = null,
     pauseAnimations = false
   } = options;
@@ -18,6 +20,9 @@ export async function waitForRenderingStability(page, options = {}) {
   let slidesDurationApplied = 0;
   let slidesFreeze = null;
   let isiScrollTopSamples = [];
+  let slidesModeResolved = null;
+  let detectedCycleMs = null;
+  let slidesEffectiveWaitMs = 0;
 
   try {
     // 0. Ensure third-party ad loaders (e.g. Enabler.js / pageLoadedHandler) have triggered
@@ -106,14 +111,45 @@ export async function waitForRenderingStability(page, options = {}) {
       logger.info(`Animation delay completed: waited ${animationDelayApplied}ms.`);
     }
 
-    // 6. Slides-first flow (slidesDuration > 0): team requirement — FIRST all
-    // banner slides play one full cycle while the ISI does NOT scroll, THEN
-    // the banner is frozen on the FIRST slide, and only after that may ISI
-    // scroll capture begin (section detection + scroll engine run after this
-    // function returns), with slide 1 held in the fixed frame throughout.
-    const slidesMs = Number(slidesDuration);
-    if (Number.isFinite(slidesMs) && slidesMs > 0) {
-      const slidesResult = await runSlidesFirstFlow(page, slidesMs, isiSelector);
+    // 6. Slides-first flow: team requirement — FIRST all banner slides play
+    // one full cycle while the ISI does NOT scroll, THEN the banner is
+    // frozen on the FIRST slide, and only after that may ISI scroll capture
+    // begin (section detection + scroll engine run after this function
+    // returns), with slide 1 held in the fixed frame throughout.
+    // The wait length depends on the slides mode:
+    //   'auto'   (DEFAULT) — the cycle is auto-detected from the banner's
+    //              own Web Animations timings; no user input needed. If no
+    //              usable animations exist (static banner), the flow is
+    //              skipped and capture proceeds normally.
+    //   'manual' — the fixed `slidesDuration` value is waited.
+    //   'off'    — the flow never runs.
+    // Backward compatibility: an explicit slidesDuration > 0 with no
+    // slidesMode resolves to 'manual' (see resolveSlidesMode).
+    slidesModeResolved = resolveSlidesMode(slidesMode, slidesDuration, DEFAULT_CONFIG.defaultTimeouts.slidesMode);
+
+    let slidesWaitMs = 0;
+    if (slidesModeResolved === 'auto') {
+      const detection = await detectSlideCycleMs(page);
+      detectedCycleMs = detection.cycleMs;
+      if (detection.capped) {
+        logger.info(`Slides flow (auto): detected slide cycle ${detection.rawMs}ms exceeds the ${MAX_SLIDE_CYCLE_MS}ms cap — waiting ${detection.cycleMs}ms instead.`);
+      }
+      if (detection.cycleMs > 0) {
+        slidesWaitMs = detection.cycleMs;
+        logger.info(`Slides flow (auto): detected a ${detection.cycleMs}ms slide cycle from ${detection.animationsCount} animation timing(s) — all slides will play first, ISI held at top, then the banner is frozen on slide 1.`);
+      } else {
+        logger.info('Slides flow (auto): no slide animations detected — slides-first skipped, capture proceeds normally.');
+      }
+    } else if (slidesModeResolved === 'manual') {
+      const slidesMs = Number(slidesDuration);
+      if (Number.isFinite(slidesMs) && slidesMs > 0) {
+        slidesWaitMs = slidesMs;
+      }
+    }
+
+    slidesEffectiveWaitMs = slidesWaitMs;
+    if (slidesWaitMs > 0) {
+      const slidesResult = await runSlidesFirstFlow(page, slidesWaitMs, isiSelector);
       slidesDurationApplied = slidesResult.waitedMs;
       slidesFreeze = slidesResult.freeze;
       isiScrollTopSamples = slidesResult.samples;
@@ -122,12 +158,55 @@ export async function waitForRenderingStability(page, options = {}) {
     logger.warn('Warning during rendering stability wait:', err.message);
   }
 
-  return { animationDelayApplied, slidesDurationApplied, slidesFreeze, isiScrollTopSamples };
+  return {
+    animationDelayApplied,
+    slidesDurationApplied,
+    slidesFreeze,
+    isiScrollTopSamples,
+    slidesMode: slidesModeResolved,
+    detectedCycleMs,
+    slidesEffectiveWaitMs
+  };
 }
 
 /**
- * Slides-first flow, executed inside waitForRenderingStability when the
- * `slidesDuration` option is > 0:
+ * AUTO slides-mode detection: reads every animation's timing from the page
+ * via the Web Animations API and computes ONE full slide cycle from them
+ * (see computeSlideCycle in slide-cycle.js). Returns the capped cycle plus
+ * diagnostics; cycleMs is 0 when no usable animation timing exists.
+ */
+async function detectSlideCycleMs(page) {
+  const timings = await page.evaluate(() => {
+    if (typeof document.getAnimations !== 'function') return [];
+    const collected = [];
+    for (const anim of document.getAnimations()) {
+      try {
+        const effect = anim.effect;
+        if (!effect) continue;
+        const timing = typeof effect.getComputedTiming === 'function'
+          ? effect.getComputedTiming()
+          : (effect.timing || {});
+        const duration = Number(timing.duration);
+        collected.push({
+          delay: Number(timing.delay) || 0,
+          duration: Number.isFinite(duration) ? duration : 0,
+          // Infinity must cross the Puppeteer boundary as a string marker.
+          iterations: timing.iterations === Infinity ? 'Infinity' : (Number(timing.iterations) || 0)
+        });
+      } catch (e) { /* skip unusable animation */ }
+    }
+    return collected;
+  }).catch(() => null);
+
+  const list = Array.isArray(timings) ? timings : [];
+  const { cycleMs, rawMs, capped } = computeSlideCycle(list);
+  return { cycleMs, rawMs, capped, animationsCount: list.length };
+}
+
+/**
+ * Slides-first flow, executed inside waitForRenderingStability when an
+ * effective slides wait applies (auto-detected cycle in 'auto' mode, or a
+ * positive `slidesDuration` in 'manual' mode):
  *   1. Resolve the ISI container (configured selector first, then the known
  *      ISI selectors) and explicitly pin it to scrollTop 0.
  *   2. Wait the full slide cycle WITHOUT any scrolling, sampling the ISI

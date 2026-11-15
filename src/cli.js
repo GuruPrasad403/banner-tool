@@ -7,6 +7,7 @@ import { createJobTempDir, createJobOutputDir } from './utils/paths.js';
 import { loadInputSource } from './input/html-loader.js';
 import { createAndLoadPage } from './browser/page-loader.js';
 import { waitForRenderingStability } from './browser/renderer.js';
+import { resolveSlidesMode } from './browser/slide-cycle.js';
 import { detectBannerSections } from './sections/section-detector.js';
 import { runValidationRules } from './validation/rule-engine.js';
 import { executeNestedScrollCapture } from './screenshots/nested-scroll-engine.js';
@@ -40,6 +41,15 @@ function parseSlidesDuration(value) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_CONFIG.defaultTimeouts.slidesDuration;
 }
 
+/**
+ * Resolves the slides-flow mode for a CLI run: an explicit --slides-mode
+ * wins; an explicit --slides-duration > 0 with no mode implies 'manual';
+ * otherwise the configured default ('auto') applies.
+ */
+function parseSlidesMode(value, slidesDuration) {
+  return resolveSlidesMode(value, slidesDuration, DEFAULT_CONFIG.defaultTimeouts.slidesMode);
+}
+
 const program = new Command();
 
 program
@@ -61,7 +71,8 @@ program
   .option('-s, --isi <selector>', 'CSS selector for nested scrollable ISI container')
   .option('-f, --fixed <selectors>', 'Comma-separated fixed section selectors (e.g. #header,#body-copy)')
   .option('--animation-delay <ms>', 'Animation delay in ms to wait for banner animation before validation', String(DEFAULT_CONFIG.defaultTimeouts.animationDelay))
-  .option('--slides-duration <ms>', 'Slides-first flow: ms for all slides to play once (ISI held at top), then freeze on slide 1 before validation', String(DEFAULT_CONFIG.defaultTimeouts.slidesDuration))
+  .option('--slides-duration <ms>', 'Slides-first flow (manual mode): ms for all slides to play once (ISI held at top), then freeze on slide 1 before validation', String(DEFAULT_CONFIG.defaultTimeouts.slidesDuration))
+  .option('--slides-mode <mode>', 'Slides flow mode: auto (detect the slide cycle from the banner animations; default) | manual (use --slides-duration) | off')
   .action(async (options) => {
     let loaded = null;
     try {
@@ -73,6 +84,7 @@ program
       const fixedSelectors = options.fixed ? options.fixed.split(',').map(s => s.trim()) : profile.fixedSelectors;
       const animationDelay = parseAnimationDelay(options.animationDelay);
       const slidesDuration = parseSlidesDuration(options.slidesDuration);
+      const slidesMode = parseSlidesMode(options.slidesMode, slidesDuration);
 
       const jobId = `cli_val_${Date.now()}`;
       const tempDir = await createJobTempDir(jobId);
@@ -86,7 +98,7 @@ program
         deviceScaleFactor: 2
       });
 
-      await waitForRenderingStability(loaded.page, { animationDelay, slidesDuration, isiSelector });
+      await waitForRenderingStability(loaded.page, { animationDelay, slidesDuration, slidesMode, isiSelector });
 
       const sectionData = await detectBannerSections(loaded.page, {
         rootSelector,
@@ -147,7 +159,8 @@ program
   .option('--scale <scale>', 'Device scale factor', '2')
   .option('--overlap <pixels>', 'Scroll overlap in pixels', '10')
   .option('--animation-delay <ms>', 'Animation delay in ms to wait for banner animation before capture', String(DEFAULT_CONFIG.defaultTimeouts.animationDelay))
-  .option('--slides-duration <ms>', 'Slides-first flow: ms for all slides to play once (ISI held at top), then freeze on slide 1 before ISI scroll capture', String(DEFAULT_CONFIG.defaultTimeouts.slidesDuration))
+  .option('--slides-duration <ms>', 'Slides-first flow (manual mode): ms for all slides to play once (ISI held at top), then freeze on slide 1 before ISI scroll capture', String(DEFAULT_CONFIG.defaultTimeouts.slidesDuration))
+  .option('--slides-mode <mode>', 'Slides flow mode: auto (detect the slide cycle from the banner animations; default) | manual (use --slides-duration) | off')
   .action(async (options) => {
     let loaded = null;
     try {
@@ -161,6 +174,7 @@ program
       const overlap = Number(options.overlap) || profile.overlap || 10;
       const animationDelay = parseAnimationDelay(options.animationDelay);
       const slidesDuration = parseSlidesDuration(options.slidesDuration);
+      const slidesMode = parseSlidesMode(options.slidesMode, slidesDuration);
 
       const jobId = `cli_cap_${Date.now()}`;
       const tempDir = await createJobTempDir(jobId);
@@ -175,7 +189,7 @@ program
         deviceScaleFactor
       });
 
-      const stabilityResult = await waitForRenderingStability(loaded.page, { animationDelay, slidesDuration, isiSelector });
+      const stabilityResult = await waitForRenderingStability(loaded.page, { animationDelay, slidesDuration, slidesMode, isiSelector });
 
       const sectionData = await detectBannerSections(loaded.page, {
         rootSelector,
@@ -203,7 +217,16 @@ program
         overlap,
         animationDelay,
         slidesDuration,
-        slidesFreeze: stabilityResult?.slidesFreeze ?? null
+        slidesMode: stabilityResult?.slidesMode ?? slidesMode,
+        detectedCycleMs: stabilityResult?.detectedCycleMs ?? null,
+        slidesWaitMs: stabilityResult?.slidesDurationApplied ?? 0,
+        slidesFreeze: stabilityResult?.slidesFreeze ?? null,
+        slidesFlow: {
+          mode: stabilityResult?.slidesMode ?? slidesMode,
+          detectedCycleMs: stabilityResult?.detectedCycleMs ?? null,
+          waitedMs: stabilityResult?.slidesDurationApplied ?? 0,
+          freeze: stabilityResult?.slidesFreeze ?? null
+        }
       };
 
       const { report } = await createJsonReport(jobId, jobConfig, sectionData, validation, scrollResult, jobOutputDir);
@@ -218,6 +241,7 @@ program
       console.log(`Validation Status:   ${validation.overallStatus.toUpperCase()}`);
       console.log(`Total Screenshots:   ${scrollResult.totalScreenshots} frames`);
       console.log(`Coverage Verified:   ${scrollResult.coverage.status === 'passed' ? 'YES (100%)' : 'NO'}`);
+      console.log(`Slides Flow:         ${jobConfig.slidesFlow.mode}${jobConfig.slidesFlow.detectedCycleMs != null ? ` (detected cycle ${jobConfig.slidesFlow.detectedCycleMs}ms)` : ''} — waited ${jobConfig.slidesFlow.waitedMs}ms, freeze ${jobConfig.slidesFlow.freeze ? (jobConfig.slidesFlow.freeze.warning ? 'WARNING' : 'held on slide 1') : 'skipped'}`);
       console.log('----------------------------------------');
       scrollResult.screenshots.forEach(s => {
         console.log(` [Frame ${s.index}] ${s.filename} -> scrollTop: ${s.scrollTop}px (Stability: ${s.stability.toUpperCase()})`);

@@ -26,6 +26,7 @@ export default function App() {
     deviceScaleFactor: 2,
     overlap: 10,
     animationDelay: 2000,
+    slidesMode: 'auto',
     slidesDuration: 0,
     rootSelector: '#banner',
     fixedSelectors: ['#header', '#body-copy'],

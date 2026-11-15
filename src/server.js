@@ -10,6 +10,7 @@ import { ensureDir, createJobTempDir, createJobOutputDir, cleanupTempDir } from 
 import { loadInputSource } from './input/html-loader.js';
 import { createAndLoadPage } from './browser/page-loader.js';
 import { waitForRenderingStability } from './browser/renderer.js';
+import { resolveSlidesMode } from './browser/slide-cycle.js';
 import { detectBannerSections } from './sections/section-detector.js';
 import { runValidationRules } from './validation/rule-engine.js';
 import { executeNestedScrollCapture } from './screenshots/nested-scroll-engine.js';
@@ -49,6 +50,19 @@ function getJob(jobId) {
     throw new AppError('JOB_NOT_FOUND', `Job with ID "${jobId}" not found.`, {}, 'Provide a valid jobId.');
   }
   return job;
+}
+
+/**
+ * Merges a per-request config override into the job config. If the override
+ * sets slidesDuration without slidesMode, the mode is re-resolved so an
+ * explicit duration implies 'manual' (backward compatibility).
+ */
+function mergeJobConfig(job, overrides) {
+  if (!overrides) return;
+  job.config = { ...job.config, ...overrides };
+  if (Object.prototype.hasOwnProperty.call(overrides, 'slidesDuration') && !Object.prototype.hasOwnProperty.call(overrides, 'slidesMode')) {
+    job.config.slidesMode = resolveSlidesMode(undefined, job.config.slidesDuration, DEFAULT_CONFIG.defaultTimeouts.slidesMode);
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -120,6 +134,13 @@ app.post('/api/jobs', (req, res, next) => {
     // Process input (copy or extract ZIP into temp processing directory)
     const loadResult = await loadInputSource(inputPath, jobTempDir, inputName);
 
+    const parsedSlidesDuration = (req.body.slidesDuration !== undefined && req.body.slidesDuration !== '' && !Number.isNaN(Number(req.body.slidesDuration)))
+      ? Math.max(0, Number(req.body.slidesDuration))
+      : DEFAULT_CONFIG.defaultTimeouts.slidesDuration;
+    // Default mode is 'auto'; an explicit slidesDuration > 0 with no
+    // slidesMode implies 'manual' (backward compatibility).
+    const parsedSlidesMode = resolveSlidesMode(req.body.slidesMode, parsedSlidesDuration, DEFAULT_CONFIG.defaultTimeouts.slidesMode);
+
     const jobRecord = {
       jobId,
       status: 'initialized',
@@ -141,9 +162,8 @@ app.post('/api/jobs', (req, res, next) => {
         animationDelay: (req.body.animationDelay !== undefined && req.body.animationDelay !== '' && !Number.isNaN(Number(req.body.animationDelay)))
           ? Math.max(0, Number(req.body.animationDelay))
           : DEFAULT_CONFIG.defaultTimeouts.animationDelay,
-        slidesDuration: (req.body.slidesDuration !== undefined && req.body.slidesDuration !== '' && !Number.isNaN(Number(req.body.slidesDuration)))
-          ? Math.max(0, Number(req.body.slidesDuration))
-          : DEFAULT_CONFIG.defaultTimeouts.slidesDuration,
+        slidesDuration: parsedSlidesDuration,
+        slidesMode: parsedSlidesMode,
         rootSelector: req.body.rootSelector || null,
         fixedSelectors: req.body.fixedSelectors ? (Array.isArray(req.body.fixedSelectors) ? req.body.fixedSelectors : [req.body.fixedSelectors]) : [],
         isiSelector: req.body.isiSelector || null
@@ -151,7 +171,8 @@ app.post('/api/jobs', (req, res, next) => {
       detectionData: null,
       validationReport: null,
       scrollResult: null,
-      slidesFreeze: null
+      slidesFreeze: null,
+      slidesFlow: null
     };
 
     jobsStore.set(jobId, jobRecord);
@@ -178,9 +199,7 @@ app.post('/api/jobs/:jobId/validate', async (req, res, next) => {
     const job = getJob(req.params.jobId);
     job.status = 'validating';
 
-    if (req.body.config) {
-      job.config = { ...job.config, ...req.body.config };
-    }
+    mergeJobConfig(job, req.body.config);
 
     // Launch browser and load page
     loaded = await createAndLoadPage(job.primaryHtmlFile, {
@@ -192,6 +211,7 @@ app.post('/api/jobs/:jobId/validate', async (req, res, next) => {
     await waitForRenderingStability(loaded.page, {
       animationDelay: job.config.animationDelay,
       slidesDuration: job.config.slidesDuration,
+      slidesMode: job.config.slidesMode,
       isiSelector: job.config.isiSelector
     });
 
@@ -233,9 +253,7 @@ app.post('/api/jobs/:jobId/capture', async (req, res, next) => {
     const job = getJob(req.params.jobId);
     job.status = 'capturing';
 
-    if (req.body.config) {
-      job.config = { ...job.config, ...req.body.config };
-    }
+    mergeJobConfig(job, req.body.config);
 
     // Load page in Puppeteer
     loaded = await createAndLoadPage(job.primaryHtmlFile, {
@@ -247,9 +265,16 @@ app.post('/api/jobs/:jobId/capture', async (req, res, next) => {
     const stabilityResult = await waitForRenderingStability(loaded.page, {
       animationDelay: job.config.animationDelay,
       slidesDuration: job.config.slidesDuration,
+      slidesMode: job.config.slidesMode,
       isiSelector: job.config.isiSelector
     });
     job.slidesFreeze = stabilityResult?.slidesFreeze ?? null;
+    job.slidesFlow = {
+      mode: stabilityResult?.slidesMode ?? job.config.slidesMode,
+      detectedCycleMs: stabilityResult?.detectedCycleMs ?? null,
+      waitedMs: stabilityResult?.slidesDurationApplied ?? 0,
+      freeze: job.slidesFreeze
+    };
 
     // Re-run section detection with updated config
     job.detectionData = await detectBannerSections(loaded.page, {
@@ -275,8 +300,14 @@ app.post('/api/jobs/:jobId/capture', async (req, res, next) => {
     job.scrollResult = scrollResult;
 
     // Create JSON Report and Capture Manifest
-    const { report } = await createJsonReport(job.jobId, job.config, job.detectionData, job.validationReport, scrollResult, job.jobOutputDir);
-    const { manifest } = await createCaptureManifest(job.jobId, { ...job.config, slidesFreeze: job.slidesFreeze ?? null }, job.detectionData, scrollResult, job.jobOutputDir);
+    const { report } = await createJsonReport(job.jobId, { ...job.config, slidesFlow: job.slidesFlow }, job.detectionData, job.validationReport, scrollResult, job.jobOutputDir);
+    const { manifest } = await createCaptureManifest(job.jobId, {
+      ...job.config,
+      slidesFreeze: job.slidesFreeze ?? null,
+      slidesMode: job.slidesFlow?.mode ?? job.config.slidesMode,
+      detectedCycleMs: job.slidesFlow?.detectedCycleMs ?? null,
+      slidesWaitMs: job.slidesFlow?.waitedMs ?? 0
+    }, job.detectionData, scrollResult, job.jobOutputDir);
     await createHtmlReport(job.jobId, report, scrollResult, job.jobOutputDir);
 
     job.status = 'completed';

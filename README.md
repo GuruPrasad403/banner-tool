@@ -109,14 +109,12 @@ affected (they use the existing scroll-settle delay).
 - Set to `0` to disable the extra wait. The value used for a job is recorded
   in `screenshot-manifest.json` under `captureSettings.animationDelayMs`.
 
-### Slides-First Flow (`slidesDuration`)
+### Slides-First Flow (`slidesMode`)
 
-Multi-slide banners follow a stricter capture order (the slides-first flow),
-driven by the **slides duration** — the total time (in milliseconds) the
-banner's slides need to play one full cycle:
+Multi-slide banners follow a stricter capture order (the slides-first flow):
 
 1. The banner loads and the ISI container is pinned to `scrollTop 0`.
-2. **All slides play fully** for `slidesDuration` ms — during this playback
+2. **All slides play fully** for one full slide cycle — during this playback
    the ISI does **not** scroll (its `scrollTop` is sampled during the wait
    and logged as evidence).
 3. When the slides finish, the banner is **frozen on the first slide**:
@@ -127,17 +125,38 @@ banner's slides need to play one full cycle:
 4. **Only then** does the ISI scroll, and screenshots are captured with the
    first slide held in the fixed frame throughout.
 
-- **Default:** `0` ms = off (`DEFAULT_CONFIG.defaultTimeouts.slidesDuration`
-  in `src/config/defaults.js`); behaviour is unchanged when unset.
-- **Dashboard:** "Slides Duration (ms) — all slides play first, ISI scrolls
-  after" field next to Animation Delay
-- **REST API:** `slidesDuration` in the job config (create-job form field or
-  the `config` object sent to the validate/capture endpoints)
-- **CLI:** `--slides-duration <ms>` on both `validate` and `capture`
-- The value used is recorded in `screenshot-manifest.json` under
-  `captureSettings.slidesDurationMs`, together with the freeze result under
-  `captureSettings.slidesFreeze` (`animationsFound` / `animationsPaused`,
-  GSAP flags, and any warning).
+The flow is controlled by the **slides mode** (`slidesMode`,
+`DEFAULT_CONFIG.defaultTimeouts.slidesMode` in `src/config/defaults.js`):
+
+- **`auto` (DEFAULT):** the slide cycle is **auto-detected** from the
+  banner's own animations — no user input needed. After the page settles,
+  every animation's timing is read through the Web Animations API and one
+  full cycle is computed as the maximum, over all animations, of
+  `delay + duration × iterations` (endlessly looping animations count as
+  one iteration; animations with duration 0 are ignored). The detected
+  cycle is capped at 30000 ms. If no usable animations are found (a static
+  banner), the log records "no slide animations detected — slides-first
+  skipped" and capture proceeds normally.
+- **`manual`:** the fixed **slides duration** (`slidesDuration`, ms) is
+  waited instead of a detected cycle. For backward compatibility, sending
+  an explicit `slidesDuration > 0` with no `slidesMode` implies `manual`.
+- **`off`:** the slides-first flow never runs.
+
+- **Dashboard:** "Slides Flow" select (Auto / Manual / Off) next to
+  Animation Delay; the "Slides Duration (ms)" field is enabled only in
+  Manual mode.
+- **REST API:** `slidesMode` and `slidesDuration` in the job config
+  (create-job form fields or the `config` object sent to the
+  validate/capture endpoints).
+- **CLI:** `--slides-mode auto|manual|off` and `--slides-duration <ms>` on
+  both `validate` and `capture`.
+- What actually happened is recorded in `screenshot-manifest.json` under
+  `captureSettings`: `slidesMode`, `detectedCycleMs` (auto mode),
+  `slidesWaitMs` (the effective wait), `slidesDurationMs` (the manual
+  setting), and the freeze result under `captureSettings.slidesFreeze`
+  (`animationsFound` / `animationsPaused`, GSAP flags, and any warning).
+  The HTML/JSON summary reports carry the same information in a
+  "Slides Flow" entry.
 
 ---
 

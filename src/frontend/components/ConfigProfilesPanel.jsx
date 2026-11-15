@@ -39,7 +39,7 @@ export default function ConfigProfilesPanel({ profiles, selectedProfile, config,
       </div>
 
       {/* Dimension & Selector Inputs */}
-      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-4">
         <div>
           <label className="block text-xs font-medium text-gray-400 mb-1">Expected Width (CSS px)</label>
           <input
@@ -96,14 +96,28 @@ export default function ConfigProfilesPanel({ profiles, selectedProfile, config,
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Slides Duration (ms) — all slides play first, ISI scrolls after</label>
+          <label className="block text-xs font-medium text-gray-400 mb-1">Slides Flow</label>
+          <select
+            value={config.slidesMode ?? 'auto'}
+            onChange={(e) => onChangeConfig({ slidesMode: e.target.value })}
+            className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-sky-500"
+          >
+            <option value="auto">Auto (play all slides first, recommended)</option>
+            <option value="manual">Manual (use Slides Duration)</option>
+            <option value="off">Off</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-400 mb-1">Slides Duration (ms) — manual mode only</label>
           <input
             type="number"
             min="0"
             step="100"
             value={config.slidesDuration ?? 0}
+            disabled={(config.slidesMode ?? 'auto') !== 'manual'}
             onChange={(e) => onChangeConfig({ slidesDuration: Number(e.target.value) })}
-            className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-sky-500"
+            className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-sky-500 disabled:opacity-40 disabled:cursor-not-allowed"
           />
         </div>
       </div>

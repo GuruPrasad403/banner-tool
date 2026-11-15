@@ -8,9 +8,30 @@ import path from 'node:path';
 export async function createHtmlReport(jobId, jsonReport, scrollResult, outputDir) {
   const screenshots = scrollResult?.screenshots || [];
 
-  const statusBadgeColor = jsonReport.status === 'passed' 
-    ? '#10b981' 
+  const statusBadgeColor = jsonReport.status === 'passed'
+    ? '#10b981'
     : (jsonReport.status === 'passed_with_warnings' ? '#f59e0b' : '#ef4444');
+
+  // Slides Flow summary card (only when the job recorded slides-flow info).
+  let slidesFlowCard = '';
+  if (jsonReport.slidesFlow) {
+    const flow = jsonReport.slidesFlow;
+    let freezeOutcome;
+    if (!flow.freeze || !flow.freeze.attempted) {
+      freezeOutcome = 'Skipped (no slide animations)';
+    } else if (flow.freeze.warning) {
+      freezeOutcome = 'Not held — see manifest warning';
+    } else {
+      freezeOutcome = `Held on slide 1 (${flow.freeze.animationsPaused}/${flow.freeze.animationsFound} animations paused)`;
+    }
+    const cycleInfo = flow.mode === 'auto' && flow.detectedCycleMs != null ? ` · cycle ${flow.detectedCycleMs} ms` : '';
+    slidesFlowCard = `
+      <div class="metric-card">
+        <div class="metric-label">Slides Flow</div>
+        <div class="metric-val" style="font-size: 15px;">${flow.mode}${cycleInfo} · waited ${flow.waitedMs ?? 0} ms</div>
+        <div style="color: var(--subtext); font-size: 12px; margin-top: 4px;">${freezeOutcome}</div>
+      </div>`;
+  }
 
   const htmlContent = `<!DOCTYPE html>
 <html lang="en">
@@ -158,7 +179,7 @@ export async function createHtmlReport(jobId, jsonReport, scrollResult, outputDi
       <div class="metric-card">
         <div class="metric-label">ISI Scroll Height</div>
         <div class="metric-val">${jsonReport.scrollMetrics?.metrics?.scrollHeight || 0} px</div>
-      </div>
+      </div>${slidesFlowCard}
     </div>
 
     <div class="section-title">Validation Rule Checks</div>
