@@ -140,7 +140,12 @@ export default function App() {
         setActiveJob((prev) => ({
           ...prev,
           scrollResult: data.scrollResult,
-          validationReport: data.report
+          // Prefer the rule-engine-shaped report ({ overallStatus,
+          // summary, rules }); data.report is the JSON-report shape
+          // ({ status, validationSummary, rules }) and breaks the
+          // validation view's header counts.
+          validationReport: data.validationReport || data.report,
+          slideFrames: data.manifest?.slideFrames || data.report?.slideFrames || []
         }));
 
         // Fetch URLs for screenshot gallery & exports
@@ -196,6 +201,7 @@ export default function App() {
             scrollResult={activeJob.scrollResult}
             jobId={activeJob.jobId}
             urls={urls}
+            slideFrames={(urls?.slideFrames && urls.slideFrames.length > 0) ? urls.slideFrames : (activeJob.slideFrames || [])}
           />
         )}
 

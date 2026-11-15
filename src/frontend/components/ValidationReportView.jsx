@@ -1,10 +1,15 @@
 import React from 'react';
 import { ShieldCheck, CheckCircle2, XCircle, AlertTriangle, FileJson } from 'lucide-react';
+import { normalizeValidationReport } from '../../validation/report-normalizer.js';
 
 export default function ValidationReportView({ report, jobId, jsonReportUrl }) {
   if (!report) return null;
 
-  const { overallStatus, summary, rules } = report;
+  // Accept BOTH report shapes (rule-engine { overallStatus, summary } and
+  // JSON-report { status, validationSummary }) and derive anything missing
+  // from the rules themselves, so the header can never disagree with the
+  // rule list rendered below it.
+  const { overallStatus, summary, rules } = normalizeValidationReport(report);
 
   const statusConfig = {
     passed: { label: 'PASSED', bg: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400', icon: CheckCircle2 },

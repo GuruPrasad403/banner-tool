@@ -31,6 +31,14 @@ export async function createCaptureManifest(jobId, jobConfig, sectionData, scrol
     },
     isiMetrics: scrollResult.initialIsiMetrics,
     totalScreenshots: scrollResult.totalScreenshots,
+    // Distinct slide frames photographed while the slides played (before
+    // the ISI scrolled); the ISI screenshots below all hold slide 1.
+    slideFrames: (jobConfig.slideFrames || []).map(f => ({
+      index: f.index,
+      file: f.file,
+      url: `/output/${jobId}/slides/${f.file}`,
+      atMs: f.atMs
+    })),
     coverageStatus: scrollResult.coverage.status,
     coverageDetails: scrollResult.coverage,
     screenshots: scrollResult.screenshots.map(s => ({

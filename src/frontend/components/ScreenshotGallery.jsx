@@ -5,7 +5,7 @@ import {
   Maximize2, RotateCcw, AlertTriangle, CheckCircle2
 } from 'lucide-react';
 
-export default function ScreenshotGallery({ scrollResult, jobId, urls }) {
+export default function ScreenshotGallery({ scrollResult, jobId, urls, slideFrames = [] }) {
   const [lightboxIndex, setLightboxIndex] = useState(null); // null = closed
   const [zoom, setZoom] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -124,6 +124,37 @@ export default function ScreenshotGallery({ scrollResult, jobId, urls }) {
             )}
           </div>
         </div>
+
+        {/* Slide Frames strip — every distinct slide, photographed while
+            the slides played with the ISI held at the top. The ISI frames
+            in the grid below all hold slide 1 (the slides-first rule). */}
+        {Array.isArray(slideFrames) && slideFrames.length > 0 && (
+          <div className="mb-6 border-b border-gray-800 pb-5">
+            <h3 className="text-sm font-semibold text-white">
+              Slide Frames (all slides, played before ISI scroll)
+            </h3>
+            <p className="text-xs text-gray-400 mt-0.5 mb-3">
+              Proof that every slide exists and played. After the slides finished, the banner was
+              frozen on slide 1 — which is why all the ISI frames below show slide 1.
+            </p>
+            <div className="flex flex-wrap gap-4">
+              {slideFrames.map((f, i) => (
+                <div key={i} className="bg-gray-950 border border-purple-500/30 rounded-xl p-3 flex flex-col items-center">
+                  <img
+                    src={f.url || `/output/${jobId}/slides/${f.file}`}
+                    alt={`Slide ${f.index ?? i + 1}`}
+                    className="max-h-[180px] w-auto object-contain rounded-lg border border-gray-800 bg-white"
+                    loading="lazy"
+                  />
+                  <div className="mt-2 text-[11px] font-bold text-white">
+                    Slide #{f.index ?? i + 1}
+                    <span className="text-gray-400 font-mono font-normal ml-2">at {f.atMs}ms</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">

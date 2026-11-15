@@ -13,6 +13,7 @@ import { waitForRenderingStability } from './browser/renderer.js';
 import { resolveSlidesMode } from './browser/slide-cycle.js';
 import { detectBannerSections } from './sections/section-detector.js';
 import { runValidationRules } from './validation/rule-engine.js';
+import { getValidationStatus } from './validation/report-normalizer.js';
 import { executeNestedScrollCapture } from './screenshots/nested-scroll-engine.js';
 import { createCaptureManifest } from './screenshots/capture-manifest.js';
 import { createJsonReport } from './reports/json-report.js';
@@ -103,7 +104,10 @@ app.get('/api/jobs', (req, res) => {
     inputName: j.inputName,
     profile: j.profile,
     createdAt: j.createdAt,
-    validationStatus: j.validationReport?.status || 'pending',
+    // Rule-engine reports carry the status as `overallStatus` (the JSON
+    // report shape calls it `status`); read both so completed jobs never
+    // report 'pending' and the dashboard Passed/Failed counters work.
+    validationStatus: getValidationStatus(j.validationReport) || 'pending',
     screenshotsCount: j.scrollResult?.totalScreenshots || 0
   }));
   res.json({ jobs: list.reverse() });
@@ -172,7 +176,8 @@ app.post('/api/jobs', (req, res, next) => {
       validationReport: null,
       scrollResult: null,
       slidesFreeze: null,
-      slidesFlow: null
+      slidesFlow: null,
+      slideFrames: []
     };
 
     jobsStore.set(jobId, jobRecord);
@@ -262,13 +267,17 @@ app.post('/api/jobs/:jobId/capture', async (req, res, next) => {
       deviceScaleFactor: job.config.deviceScaleFactor
     });
 
+    const slidesDir = path.join(job.jobOutputDir, 'slides');
     const stabilityResult = await waitForRenderingStability(loaded.page, {
       animationDelay: job.config.animationDelay,
       slidesDuration: job.config.slidesDuration,
       slidesMode: job.config.slidesMode,
-      isiSelector: job.config.isiSelector
+      isiSelector: job.config.isiSelector,
+      rootSelector: job.config.rootSelector,
+      slidesDir
     });
     job.slidesFreeze = stabilityResult?.slidesFreeze ?? null;
+    job.slideFrames = stabilityResult?.slideFrames ?? [];
     job.slidesFlow = {
       mode: stabilityResult?.slidesMode ?? job.config.slidesMode,
       detectedCycleMs: stabilityResult?.detectedCycleMs ?? null,
@@ -300,10 +309,11 @@ app.post('/api/jobs/:jobId/capture', async (req, res, next) => {
     job.scrollResult = scrollResult;
 
     // Create JSON Report and Capture Manifest
-    const { report } = await createJsonReport(job.jobId, { ...job.config, slidesFlow: job.slidesFlow }, job.detectionData, job.validationReport, scrollResult, job.jobOutputDir);
+    const { report } = await createJsonReport(job.jobId, { ...job.config, slidesFlow: job.slidesFlow, slideFrames: job.slideFrames }, job.detectionData, job.validationReport, scrollResult, job.jobOutputDir);
     const { manifest } = await createCaptureManifest(job.jobId, {
       ...job.config,
       slidesFreeze: job.slidesFreeze ?? null,
+      slideFrames: job.slideFrames,
       slidesMode: job.slidesFlow?.mode ?? job.config.slidesMode,
       detectedCycleMs: job.slidesFlow?.detectedCycleMs ?? null,
       slidesWaitMs: job.slidesFlow?.waitedMs ?? 0
@@ -317,6 +327,11 @@ app.post('/api/jobs/:jobId/capture', async (req, res, next) => {
       success: true,
       status: job.status,
       scrollResult,
+      // Rule-engine shape ({ overallStatus, summary, rules }) — the
+      // dashboard validation view reads this; `report` below is the
+      // JSON-report shape ({ status, validationSummary, rules }) whose
+      // differently-named fields used to break that view after capture.
+      validationReport: job.validationReport,
       report,
       manifest
     });
@@ -356,9 +371,15 @@ app.get('/api/jobs/:jobId/screenshots', (req, res) => {
     url: `/output/${job.jobId}/screenshots/${s.filename}`
   }));
 
+  const slideFrames = (job.slideFrames || []).map(f => ({
+    ...f,
+    url: `/output/${job.jobId}/slides/${f.file}`
+  }));
+
   res.json({
     total: list.length,
     screenshots: list,
+    slideFrames,
     manifestUrl: `/output/${job.jobId}/screenshot-manifest.json`,
     htmlReportUrl: `/output/${job.jobId}/summary.html`,
     jsonReportUrl: `/output/${job.jobId}/validation-report.json`

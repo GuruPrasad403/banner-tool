@@ -33,6 +33,24 @@ export async function createHtmlReport(jobId, jsonReport, scrollResult, outputDi
       </div>`;
   }
 
+  // Slide Frames gallery: every distinct slide, photographed while the
+  // slides played (ISI held at top). The ISI frames further down all hold
+  // slide 1 — that contrast is the slides-first rule working as intended.
+  const slideFrames = Array.isArray(jsonReport.slideFrames) ? jsonReport.slideFrames : [];
+  const slideFramesSection = slideFrames.length === 0 ? '' : `
+    <div class="section-title">Slide Frames (all slides, played before ISI scroll)</div>
+    <div class="gallery">
+      ${slideFrames.map((f, i) => `
+        <div class="shot-card">
+          <img src="slides/${f.file}" alt="Slide ${f.index ?? i + 1}" />
+          <div class="shot-meta">
+            <div><strong>Slide #${f.index ?? i + 1}</strong></div>
+            <div>at ${f.atMs} ms into slide playback</div>
+          </div>
+        </div>
+      `).join('')}
+    </div>`;
+
   const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -193,7 +211,7 @@ export async function createHtmlReport(jobId, jsonReport, scrollResult, outputDi
         </div>
       `).join('')}
     </div>
-
+${slideFramesSection}
     <div class="section-title">Captured Banner Frames (Fixed Frame + Nested ISI Scroll)</div>
     <div class="gallery">
       ${screenshots.map((s, idx) => `

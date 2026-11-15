@@ -1,6 +1,10 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { DEFAULT_CONFIG } from '../config/defaults.js';
 import { logger } from '../utils/logger.js';
-import { computeSlideCycle, resolveSlidesMode, MAX_SLIDE_CYCLE_MS } from './slide-cycle.js';
+import { ensureDir } from '../utils/paths.js';
+import { computeSlideCycle, resolveSlidesMode, selectStableSlideFrames, MAX_SLIDE_CYCLE_MS } from './slide-cycle.js';
 
 /**
  * Ensures browser page layout, fonts, images, and rendering have fully stabilized before screenshot or validation.
@@ -13,12 +17,17 @@ export async function waitForRenderingStability(page, options = {}) {
     slidesDuration = DEFAULT_CONFIG.defaultTimeouts.slidesDuration,
     slidesMode = undefined,
     isiSelector = null,
+    rootSelector = null,
+    slidesDir = null,
+    slideSampleIntervalMs = 450,
+    maxSlideFrames = 6,
     pauseAnimations = false
   } = options;
 
   let animationDelayApplied = 0;
   let slidesDurationApplied = 0;
   let slidesFreeze = null;
+  let slideFrames = [];
   let isiScrollTopSamples = [];
   let slidesModeResolved = null;
   let detectedCycleMs = null;
@@ -149,9 +158,15 @@ export async function waitForRenderingStability(page, options = {}) {
 
     slidesEffectiveWaitMs = slidesWaitMs;
     if (slidesWaitMs > 0) {
-      const slidesResult = await runSlidesFirstFlow(page, slidesWaitMs, isiSelector);
+      const slidesResult = await runSlidesFirstFlow(page, slidesWaitMs, isiSelector, {
+        rootSelector,
+        slidesDir,
+        slideSampleIntervalMs,
+        maxSlideFrames
+      });
       slidesDurationApplied = slidesResult.waitedMs;
       slidesFreeze = slidesResult.freeze;
+      slideFrames = slidesResult.slideFrames || [];
       isiScrollTopSamples = slidesResult.samples;
     }
   } catch (err) {
@@ -162,6 +177,7 @@ export async function waitForRenderingStability(page, options = {}) {
     animationDelayApplied,
     slidesDurationApplied,
     slidesFreeze,
+    slideFrames,
     isiScrollTopSamples,
     slidesMode: slidesModeResolved,
     detectedCycleMs,
@@ -217,8 +233,18 @@ async function detectSlideCycleMs(page) {
  *      timeline at time 0. Counts what was found/paused. If nothing could be
  *      frozen, a clear warning is logged and recorded (never silently
  *      pretend the freeze worked).
+ *
+ * Before the wait, animations are restarted at time 0 so the playback that
+ * is sampled is one full cycle FROM slide 1 (this also makes the recorded
+ * slide frames deterministic). While waiting, when `slidesDir` is given,
+ * the banner is photographed every ~450 ms: the slide region (everything
+ * above the ISI container) of each sample is hashed, samples are grouped
+ * into stable slide states (see selectStableSlideFrames), and the last
+ * frame of each distinct slide is written to slidesDir as slide-01.png,
+ * slide-02.png, … — the owner's proof that slides 2, 3, … exist and
+ * played, even though the ISI frames below all hold slide 1 by rule.
  */
-async function runSlidesFirstFlow(page, slidesMs, isiSelector) {
+async function runSlidesFirstFlow(page, slidesMs, isiSelector, captureOptions = {}) {
   const candidates = [isiSelector, ...DEFAULT_CONFIG.knownSelectors.isi].filter(Boolean);
 
   // 1. Pin the ISI container to the very top before the slides play.
@@ -248,6 +274,30 @@ async function runSlidesFirstFlow(page, slidesMs, isiSelector) {
     logger.warn('Slides-first: ISI container not found before slide playback; slides will still play and freeze, but the ISI-at-top pin could not be applied.');
   }
 
+  // 1b. Restart animations at time 0 so the sampled playback is one full
+  // cycle starting from slide 1 (best effort; harmless when absent).
+  await page.evaluate(() => {
+    try {
+      const animations = typeof document.getAnimations === 'function' ? document.getAnimations() : [];
+      for (const anim of animations) {
+        try { anim.currentTime = 0; } catch (e) { /* some animations reject seeking */ }
+        try { if (anim.playState !== 'running') anim.play(); } catch (e) { /* best effort */ }
+      }
+    } catch (e) { /* getAnimations unavailable */ }
+    try {
+      if (window.gsap && window.gsap.globalTimeline) {
+        window.gsap.globalTimeline.play(0);
+      }
+    } catch (e) { /* no GSAP */ }
+  }).catch(() => {});
+
+  // Slide-frame sampling setup (only when an output dir was provided).
+  const wantSlideFrames = Boolean(captureOptions.slidesDir);
+  const slideGeometry = wantSlideFrames
+    ? await computeSlideGeometry(page, captureOptions.rootSelector, isiPin && isiPin.found ? isiPin.selector : null)
+    : null;
+  const slideSamples = [];
+
   // 2. Wait the full slide cycle with NO scrolling; sample ISI scrollTop.
   logger.info(`Slides-first: playing all slides for ${slidesMs}ms — ISI must NOT scroll during slide playback...`);
   const waitStart = Date.now();
@@ -261,12 +311,24 @@ async function runSlidesFirstFlow(page, slidesMs, isiSelector) {
     samples.push({ atMs: Date.now() - waitStart, scrollTop: top });
   };
 
+  const captureSlideSample = async () => {
+    if (!slideGeometry) return;
+    try {
+      const buffer = await page.screenshot({ clip: slideGeometry.rootClip });
+      const region = await page.screenshot({ clip: slideGeometry.regionClip });
+      const regionHash = createHash('sha256').update(region).digest('hex');
+      slideSamples.push({ buffer, regionHash, atMs: Date.now() - waitStart });
+    } catch (e) { /* slide sampling is best effort */ }
+  };
+
   await sampleIsiScrollTop();
-  const sampleIntervalMs = 500;
+  await captureSlideSample();
+  const sampleIntervalMs = Math.max(100, Number(captureOptions.slideSampleIntervalMs) || 450);
   while (Date.now() - waitStart < slidesMs) {
     const remaining = slidesMs - (Date.now() - waitStart);
     await new Promise((resolve) => setTimeout(resolve, Math.min(sampleIntervalMs, remaining)));
     await sampleIsiScrollTop();
+    await captureSlideSample();
   }
   const waitedMs = Date.now() - waitStart;
   logger.info(`Slides-first: slide playback wait completed: waited ${waitedMs}ms. ISI scrollTop samples during wait: ${JSON.stringify(samples)}`);
@@ -331,5 +393,74 @@ async function runSlidesFirstFlow(page, slidesMs, isiSelector) {
     logger.warn(`Slides-first: ${freeze.warning}`);
   }
 
-  return { waitedMs, freeze, samples };
+  // 4. Persist the distinct slide frames recorded during the wait: the
+  // last frame of each stable slide state, in playback order.
+  let slideFrames = [];
+  if (slideGeometry && slideSamples.length > 0) {
+    try {
+      const selected = selectStableSlideFrames(slideSamples, {
+        maxFrames: captureOptions.maxSlideFrames ?? 6
+      });
+      await ensureDir(captureOptions.slidesDir);
+      for (let i = 0; i < selected.length; i++) {
+        const file = `slide-${String(i + 1).padStart(2, '0')}.png`;
+        await fs.writeFile(path.join(captureOptions.slidesDir, file), selected[i].buffer);
+        slideFrames.push({ index: i + 1, file, atMs: selected[i].atMs });
+      }
+      logger.info(`Slides-first: recorded ${slideFrames.length} distinct slide frame(s) from ${slideSamples.length} samples during slide playback.`);
+    } catch (err) {
+      logger.warn(`Slides-first: could not save slide frames: ${err.message}`);
+      slideFrames = [];
+    }
+  }
+
+  return { waitedMs, freeze, samples, slideFrames };
+}
+
+/**
+ * Geometry for slide-frame sampling: the clip of the whole banner root,
+ * and the clip of the "slide region" — everything in the root above the
+ * ISI container (header + slide stage). Identical slide pixels hash
+ * identically, which is what the stable-state dedupe keys on. Falls back
+ * to the whole root when no ISI element is found.
+ */
+async function computeSlideGeometry(page, rootSelector, isiSelector) {
+  const geo = await page.evaluate((args) => {
+    let rootEl = null;
+    for (const sel of args.rootCandidates) {
+      if (!sel) continue;
+      try { rootEl = document.querySelector(sel); } catch (e) { /* invalid selector */ }
+      if (rootEl) break;
+    }
+    if (!rootEl) rootEl = document.body;
+    if (!rootEl) return null;
+
+    const r = rootEl.getBoundingClientRect();
+    const rootClip = {
+      x: Math.max(0, Math.floor(r.x)),
+      y: Math.max(0, Math.floor(r.y)),
+      width: Math.max(1, Math.round(r.width)),
+      height: Math.max(1, Math.round(r.height))
+    };
+
+    let regionClip = { ...rootClip };
+    if (args.isiSelector) {
+      let isiEl = null;
+      try { isiEl = document.querySelector(args.isiSelector); } catch (e) { /* invalid selector */ }
+      if (isiEl) {
+        const ir = isiEl.getBoundingClientRect();
+        const h = Math.round(ir.y - r.y);
+        if (h > 0 && h < rootClip.height) {
+          regionClip = { ...rootClip, height: h };
+        }
+      }
+    }
+
+    return { rootClip, regionClip };
+  }, {
+    rootCandidates: [rootSelector, ...DEFAULT_CONFIG.knownSelectors.root],
+    isiSelector: isiSelector || null
+  }).catch(() => null);
+
+  return geo || null;
 }

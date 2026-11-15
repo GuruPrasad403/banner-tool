@@ -179,6 +179,7 @@ program
       const jobId = `cli_cap_${Date.now()}`;
       const tempDir = await createJobTempDir(jobId);
       const { jobOutputDir, screenshotsDir } = await createJobOutputDir(jobId);
+      const slidesDir = path.join(jobOutputDir, 'slides');
 
       logger.info(`Starting automated screenshot capture for: ${options.input}`);
       const loadResult = await loadInputSource(options.input, tempDir);
@@ -189,7 +190,7 @@ program
         deviceScaleFactor
       });
 
-      const stabilityResult = await waitForRenderingStability(loaded.page, { animationDelay, slidesDuration, slidesMode, isiSelector });
+      const stabilityResult = await waitForRenderingStability(loaded.page, { animationDelay, slidesDuration, slidesMode, isiSelector, rootSelector, slidesDir });
 
       const sectionData = await detectBannerSections(loaded.page, {
         rootSelector,
@@ -221,6 +222,7 @@ program
         detectedCycleMs: stabilityResult?.detectedCycleMs ?? null,
         slidesWaitMs: stabilityResult?.slidesDurationApplied ?? 0,
         slidesFreeze: stabilityResult?.slidesFreeze ?? null,
+        slideFrames: stabilityResult?.slideFrames ?? [],
         slidesFlow: {
           mode: stabilityResult?.slidesMode ?? slidesMode,
           detectedCycleMs: stabilityResult?.detectedCycleMs ?? null,
@@ -242,6 +244,7 @@ program
       console.log(`Total Screenshots:   ${scrollResult.totalScreenshots} frames`);
       console.log(`Coverage Verified:   ${scrollResult.coverage.status === 'passed' ? 'YES (100%)' : 'NO'}`);
       console.log(`Slides Flow:         ${jobConfig.slidesFlow.mode}${jobConfig.slidesFlow.detectedCycleMs != null ? ` (detected cycle ${jobConfig.slidesFlow.detectedCycleMs}ms)` : ''} — waited ${jobConfig.slidesFlow.waitedMs}ms, freeze ${jobConfig.slidesFlow.freeze ? (jobConfig.slidesFlow.freeze.warning ? 'WARNING' : 'held on slide 1') : 'skipped'}`);
+      console.log(`Slide Frames:        ${jobConfig.slideFrames.length} distinct slide(s) recorded during playback${jobConfig.slideFrames.length ? ` (${jobConfig.slideFrames.map(f => f.file).join(', ')})` : ''}`);
       console.log('----------------------------------------');
       scrollResult.screenshots.forEach(s => {
         console.log(` [Frame ${s.index}] ${s.filename} -> scrollTop: ${s.scrollTop}px (Stability: ${s.stability.toUpperCase()})`);
