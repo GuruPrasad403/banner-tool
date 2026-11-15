@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Animated Slides Banner 300x250 (Slides-First Verification Fixture)</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #f3f4f6;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    #banner {
+      width: 300px;
+      height: 250px;
+      background: #ffffff;
+      border: 1px solid #7c3aed;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    #header {
+      height: 40px;
+      background: #111827;
+      color: #ffffff;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    #header h1 {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    #header span {
+      font-size: 9px;
+      color: #a5b4fc;
+    }
+
+    /* Slides stage: three slides crossfade on ONE shared 6s cycle.
+       Each slide has its OWN keyframes (same duration, same start, no delay),
+       so local time 0 for every animation = "slide 1 visible" — which is what
+       the slides-first freeze (pause all animations at currentTime 0) holds. */
+    #body-copy {
+      height: 120px;
+      position: relative;
+      flex-shrink: 0;
+      overflow: hidden;
+      background: #000000;
+    }
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: 1px;
+      opacity: 0;
+      animation-duration: 6s;
+      animation-timing-function: linear;
+      animation-iteration-count: infinite;
+    }
+    .slide-1 {
+      background: #dc2626;
+      animation-name: slideOneCycle;
+    }
+    .slide-2 {
+      background: #059669;
+      animation-name: slideTwoCycle;
+    }
+    .slide-3 {
+      background: #2563eb;
+      animation-name: slideThreeCycle;
+    }
+    /* Slide 1: visible 0-30%, fades out 30-36%, hidden 36-94%, fades in 94-100% */
+    @keyframes slideOneCycle {
+      0%   { opacity: 1; }
+      30%  { opacity: 1; }
+      36%  { opacity: 0; }
+      94%  { opacity: 0; }
+      100% { opacity: 1; }
+    }
+    /* Slide 2: hidden 0-30%, fades in 30-36%, visible 36-63%, fades out 63-69%, hidden 69-100% */
+    @keyframes slideTwoCycle {
+      0%   { opacity: 0; }
+      30%  { opacity: 0; }
+      36%  { opacity: 1; }
+      63%  { opacity: 1; }
+      69%  { opacity: 0; }
+      100% { opacity: 0; }
+    }
+    /* Slide 3: hidden 0-63%, fades in 63-69%, visible 69-94%, fades out 94-100% */
+    @keyframes slideThreeCycle {
+      0%   { opacity: 0; }
+      63%  { opacity: 0; }
+      69%  { opacity: 1; }
+      94%  { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    #isi-container {
+      flex: 1;
+      overflow-y: scroll;
+      background: #fffbeb;
+      border-top: 2px solid #7c3aed;
+      padding: 8px 10px;
+      font-size: 10px;
+      line-height: 1.5;
+      color: #44403c;
+    }
+    #isi-container h2 {
+      font-size: 11px;
+      margin-bottom: 4px;
+      color: #111827;
+    }
+    #isi-container p {
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div id="banner">
+    <div id="header">
+      <h1>SLIDES-FIRST FIXTURE</h1>
+      <span>300x250</span>
+    </div>
+
+    <div id="body-copy">
+      <div class="slide slide-1">SLIDE 1</div>
+      <div class="slide slide-2">SLIDE 2</div>
+      <div class="slide slide-3">SLIDE 3</div>
+    </div>
+
+    <div id="isi-container">
+      <h2>IMPORTANT SAFETY INFORMATION</h2>
+      <p>1. This is a verification fixture for the slides-first capture flow. The three slides above play one full 6-second cycle while this ISI container must remain at scrollTop 0.</p>
+      <p>2. After the slides finish, the banner must be frozen on SLIDE 1. Only then may this ISI content scroll for screenshots, with SLIDE 1 held in the frame above.</p>
+      <p>3. Do not take this product if you are allergic to sample banners, placeholder text, or automated screenshot verification fixtures of any kind.</p>
+      <p>4. Tell your doctor if you experience unexpected layout shifts, missing assets, horizontal overflow, or fixed regions that move while the nested ISI container scrolls.</p>
+      <p>5. The most common side effects of reading fixture safety information include attention to detail, correct dimension validation, and complete scroll coverage.</p>
+      <p>6. This container intentionally contains more text than fits in its visible area so the scroll engine must plan multiple frames to reach maxScrollTop.</p>
+      <p>7. Frame one must start at scrollTop 0. The final frame must reach the maximum scroll position so coverage validation passes at one hundred percent.</p>
+      <p>8. If the slide region differs between the first and last ISI frames, the freeze did not hold slide 1 and this fixture has done its job by failing.</p>
+      <p>9. Keep this banner at room temperature. Protect from light, moisture, and manual screenshots taken before the animation has finished playing.</p>
+      <p>10. End of the important safety information. Thank you for scrolling the full nested ISI content of this verification fixture banner.</p>
+    </div>
+  </div>
+</body>
+</html>

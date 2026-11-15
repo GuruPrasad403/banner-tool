@@ -19,6 +19,14 @@ export const DEFAULT_CONFIG = {
     // captured mid-animation. Set per job via the `animationDelay` option
     // (dashboard field / API config / CLI --animation-delay). 0 disables it.
     animationDelay: 2000,
+    // Slides-first flow (ms): total time for ALL banner slides to play one
+    // full cycle while the ISI is held at scrollTop 0 (no ISI scrolling).
+    // When > 0, after this wait the banner animations are frozen on the
+    // first slide (Web Animations API / GSAP, best effort) and only then
+    // does ISI scroll capture begin, with slide 1 held in the fixed frame.
+    // Set per job via the `slidesDuration` option (dashboard field / API
+    // config / CLI --slides-duration). 0 = off (default; behaviour unchanged).
+    slidesDuration: 0,
   },
   knownSelectors: {
     root: ['#banner', '#wrapper', '#wrapper1', '.banner', '#ad-container', '#container', '.ad-frame', '#ad-stage', '#ad-experience', '.ad-stage', '#app'],

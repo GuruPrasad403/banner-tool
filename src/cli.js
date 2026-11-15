@@ -28,6 +28,18 @@ function parseAnimationDelay(value) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_CONFIG.defaultTimeouts.animationDelay;
 }
 
+/**
+ * Parses a slides-duration CLI value (ms) for the slides-first flow. Falls
+ * back to the configured default (0 = off) when missing or invalid.
+ */
+function parseSlidesDuration(value) {
+  if (value === undefined || value === null || value === '') {
+    return DEFAULT_CONFIG.defaultTimeouts.slidesDuration;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_CONFIG.defaultTimeouts.slidesDuration;
+}
+
 const program = new Command();
 
 program
@@ -49,6 +61,7 @@ program
   .option('-s, --isi <selector>', 'CSS selector for nested scrollable ISI container')
   .option('-f, --fixed <selectors>', 'Comma-separated fixed section selectors (e.g. #header,#body-copy)')
   .option('--animation-delay <ms>', 'Animation delay in ms to wait for banner animation before validation', String(DEFAULT_CONFIG.defaultTimeouts.animationDelay))
+  .option('--slides-duration <ms>', 'Slides-first flow: ms for all slides to play once (ISI held at top), then freeze on slide 1 before validation', String(DEFAULT_CONFIG.defaultTimeouts.slidesDuration))
   .action(async (options) => {
     let loaded = null;
     try {
@@ -59,6 +72,7 @@ program
       const isiSelector = options.isi || profile.isiSelector;
       const fixedSelectors = options.fixed ? options.fixed.split(',').map(s => s.trim()) : profile.fixedSelectors;
       const animationDelay = parseAnimationDelay(options.animationDelay);
+      const slidesDuration = parseSlidesDuration(options.slidesDuration);
 
       const jobId = `cli_val_${Date.now()}`;
       const tempDir = await createJobTempDir(jobId);
@@ -72,7 +86,7 @@ program
         deviceScaleFactor: 2
       });
 
-      await waitForRenderingStability(loaded.page, { animationDelay });
+      await waitForRenderingStability(loaded.page, { animationDelay, slidesDuration, isiSelector });
 
       const sectionData = await detectBannerSections(loaded.page, {
         rootSelector,
@@ -133,6 +147,7 @@ program
   .option('--scale <scale>', 'Device scale factor', '2')
   .option('--overlap <pixels>', 'Scroll overlap in pixels', '10')
   .option('--animation-delay <ms>', 'Animation delay in ms to wait for banner animation before capture', String(DEFAULT_CONFIG.defaultTimeouts.animationDelay))
+  .option('--slides-duration <ms>', 'Slides-first flow: ms for all slides to play once (ISI held at top), then freeze on slide 1 before ISI scroll capture', String(DEFAULT_CONFIG.defaultTimeouts.slidesDuration))
   .action(async (options) => {
     let loaded = null;
     try {
@@ -145,6 +160,7 @@ program
       const deviceScaleFactor = Number(options.scale) || profile.deviceScaleFactor || 2;
       const overlap = Number(options.overlap) || profile.overlap || 10;
       const animationDelay = parseAnimationDelay(options.animationDelay);
+      const slidesDuration = parseSlidesDuration(options.slidesDuration);
 
       const jobId = `cli_cap_${Date.now()}`;
       const tempDir = await createJobTempDir(jobId);
@@ -159,7 +175,7 @@ program
         deviceScaleFactor
       });
 
-      await waitForRenderingStability(loaded.page, { animationDelay });
+      const stabilityResult = await waitForRenderingStability(loaded.page, { animationDelay, slidesDuration, isiSelector });
 
       const sectionData = await detectBannerSections(loaded.page, {
         rootSelector,
@@ -185,7 +201,9 @@ program
         expectedHeight,
         deviceScaleFactor,
         overlap,
-        animationDelay
+        animationDelay,
+        slidesDuration,
+        slidesFreeze: stabilityResult?.slidesFreeze ?? null
       };
 
       const { report } = await createJsonReport(jobId, jobConfig, sectionData, validation, scrollResult, jobOutputDir);

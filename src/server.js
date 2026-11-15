@@ -141,13 +141,17 @@ app.post('/api/jobs', (req, res, next) => {
         animationDelay: (req.body.animationDelay !== undefined && req.body.animationDelay !== '' && !Number.isNaN(Number(req.body.animationDelay)))
           ? Math.max(0, Number(req.body.animationDelay))
           : DEFAULT_CONFIG.defaultTimeouts.animationDelay,
+        slidesDuration: (req.body.slidesDuration !== undefined && req.body.slidesDuration !== '' && !Number.isNaN(Number(req.body.slidesDuration)))
+          ? Math.max(0, Number(req.body.slidesDuration))
+          : DEFAULT_CONFIG.defaultTimeouts.slidesDuration,
         rootSelector: req.body.rootSelector || null,
         fixedSelectors: req.body.fixedSelectors ? (Array.isArray(req.body.fixedSelectors) ? req.body.fixedSelectors : [req.body.fixedSelectors]) : [],
         isiSelector: req.body.isiSelector || null
       },
       detectionData: null,
       validationReport: null,
-      scrollResult: null
+      scrollResult: null,
+      slidesFreeze: null
     };
 
     jobsStore.set(jobId, jobRecord);
@@ -185,7 +189,11 @@ app.post('/api/jobs/:jobId/validate', async (req, res, next) => {
       deviceScaleFactor: job.config.deviceScaleFactor
     });
 
-    await waitForRenderingStability(loaded.page, { animationDelay: job.config.animationDelay });
+    await waitForRenderingStability(loaded.page, {
+      animationDelay: job.config.animationDelay,
+      slidesDuration: job.config.slidesDuration,
+      isiSelector: job.config.isiSelector
+    });
 
     // Section detection
     const sectionData = await detectBannerSections(loaded.page, {
@@ -236,7 +244,12 @@ app.post('/api/jobs/:jobId/capture', async (req, res, next) => {
       deviceScaleFactor: job.config.deviceScaleFactor
     });
 
-    await waitForRenderingStability(loaded.page, { animationDelay: job.config.animationDelay });
+    const stabilityResult = await waitForRenderingStability(loaded.page, {
+      animationDelay: job.config.animationDelay,
+      slidesDuration: job.config.slidesDuration,
+      isiSelector: job.config.isiSelector
+    });
+    job.slidesFreeze = stabilityResult?.slidesFreeze ?? null;
 
     // Re-run section detection with updated config
     job.detectionData = await detectBannerSections(loaded.page, {
@@ -263,7 +276,7 @@ app.post('/api/jobs/:jobId/capture', async (req, res, next) => {
 
     // Create JSON Report and Capture Manifest
     const { report } = await createJsonReport(job.jobId, job.config, job.detectionData, job.validationReport, scrollResult, job.jobOutputDir);
-    const { manifest } = await createCaptureManifest(job.jobId, job.config, job.detectionData, scrollResult, job.jobOutputDir);
+    const { manifest } = await createCaptureManifest(job.jobId, { ...job.config, slidesFreeze: job.slidesFreeze ?? null }, job.detectionData, scrollResult, job.jobOutputDir);
     await createHtmlReport(job.jobId, report, scrollResult, job.jobOutputDir);
 
     job.status = 'completed';

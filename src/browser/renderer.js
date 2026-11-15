@@ -9,10 +9,15 @@ export async function waitForRenderingStability(page, options = {}) {
     fontsTimeout = DEFAULT_CONFIG.defaultTimeouts.fontsReady,
     settleDelay = DEFAULT_CONFIG.defaultTimeouts.renderSettle,
     animationDelay = DEFAULT_CONFIG.defaultTimeouts.animationDelay,
+    slidesDuration = DEFAULT_CONFIG.defaultTimeouts.slidesDuration,
+    isiSelector = null,
     pauseAnimations = false
   } = options;
 
   let animationDelayApplied = 0;
+  let slidesDurationApplied = 0;
+  let slidesFreeze = null;
+  let isiScrollTopSamples = [];
 
   try {
     // 0. Ensure third-party ad loaders (e.g. Enabler.js / pageLoadedHandler) have triggered
@@ -100,9 +105,152 @@ export async function waitForRenderingStability(page, options = {}) {
       animationDelayApplied = Date.now() - waitStart;
       logger.info(`Animation delay completed: waited ${animationDelayApplied}ms.`);
     }
+
+    // 6. Slides-first flow (slidesDuration > 0): team requirement — FIRST all
+    // banner slides play one full cycle while the ISI does NOT scroll, THEN
+    // the banner is frozen on the FIRST slide, and only after that may ISI
+    // scroll capture begin (section detection + scroll engine run after this
+    // function returns), with slide 1 held in the fixed frame throughout.
+    const slidesMs = Number(slidesDuration);
+    if (Number.isFinite(slidesMs) && slidesMs > 0) {
+      const slidesResult = await runSlidesFirstFlow(page, slidesMs, isiSelector);
+      slidesDurationApplied = slidesResult.waitedMs;
+      slidesFreeze = slidesResult.freeze;
+      isiScrollTopSamples = slidesResult.samples;
+    }
   } catch (err) {
     logger.warn('Warning during rendering stability wait:', err.message);
   }
 
-  return { animationDelayApplied };
+  return { animationDelayApplied, slidesDurationApplied, slidesFreeze, isiScrollTopSamples };
+}
+
+/**
+ * Slides-first flow, executed inside waitForRenderingStability when the
+ * `slidesDuration` option is > 0:
+ *   1. Resolve the ISI container (configured selector first, then the known
+ *      ISI selectors) and explicitly pin it to scrollTop 0.
+ *   2. Wait the full slide cycle WITHOUT any scrolling, sampling the ISI
+ *      scrollTop during the wait so the "ISI did not scroll" requirement is
+ *      evidenced, not assumed.
+ *   3. Freeze the banner on the FIRST slide (best effort): Web Animations
+ *      API — pause every animation at currentTime 0; GSAP — pause the global
+ *      timeline at time 0. Counts what was found/paused. If nothing could be
+ *      frozen, a clear warning is logged and recorded (never silently
+ *      pretend the freeze worked).
+ */
+async function runSlidesFirstFlow(page, slidesMs, isiSelector) {
+  const candidates = [isiSelector, ...DEFAULT_CONFIG.knownSelectors.isi].filter(Boolean);
+
+  // 1. Pin the ISI container to the very top before the slides play.
+  const isiPin = await page.evaluate((selectors) => {
+    let firstMatch = null;
+    for (const selector of selectors) {
+      let el = null;
+      try { el = document.querySelector(selector); } catch (e) { /* invalid selector */ }
+      if (!el) continue;
+      if (!firstMatch) firstMatch = { el, selector };
+      if (el.scrollHeight > el.clientHeight) {
+        el.scrollTop = 0;
+        return { found: true, selector, scrollTop: el.scrollTop };
+      }
+    }
+    if (firstMatch) {
+      firstMatch.el.scrollTop = 0;
+      return { found: true, selector: firstMatch.selector, scrollTop: firstMatch.el.scrollTop };
+    }
+    return { found: false, selector: null, scrollTop: null };
+  }, candidates).catch(() => ({ found: false, selector: null, scrollTop: null }))
+    .then((r) => r || { found: false, selector: null, scrollTop: null });
+
+  if (isiPin && isiPin.found) {
+    logger.info(`Slides-first: ISI container "${isiPin.selector}" pinned to scrollTop 0 before slide playback.`);
+  } else {
+    logger.warn('Slides-first: ISI container not found before slide playback; slides will still play and freeze, but the ISI-at-top pin could not be applied.');
+  }
+
+  // 2. Wait the full slide cycle with NO scrolling; sample ISI scrollTop.
+  logger.info(`Slides-first: playing all slides for ${slidesMs}ms — ISI must NOT scroll during slide playback...`);
+  const waitStart = Date.now();
+  const samples = [];
+  const sampleIsiScrollTop = async () => {
+    if (!isiPin || !isiPin.found) return;
+    const top = await page.evaluate((selector) => {
+      const el = document.querySelector(selector);
+      return el ? el.scrollTop : null;
+    }, isiPin.selector).catch(() => null);
+    samples.push({ atMs: Date.now() - waitStart, scrollTop: top });
+  };
+
+  await sampleIsiScrollTop();
+  const sampleIntervalMs = 500;
+  while (Date.now() - waitStart < slidesMs) {
+    const remaining = slidesMs - (Date.now() - waitStart);
+    await new Promise((resolve) => setTimeout(resolve, Math.min(sampleIntervalMs, remaining)));
+    await sampleIsiScrollTop();
+  }
+  const waitedMs = Date.now() - waitStart;
+  logger.info(`Slides-first: slide playback wait completed: waited ${waitedMs}ms. ISI scrollTop samples during wait: ${JSON.stringify(samples)}`);
+
+  // 3. Freeze on the FIRST slide (best effort).
+  const freezeRaw = await page.evaluate(() => {
+    const result = {
+      animationsFound: 0,
+      animationsPaused: 0,
+      gsapFound: false,
+      gsapPaused: false
+    };
+
+    // (a) Web Animations API: hold every animation at its first frame.
+    try {
+      const animations = typeof document.getAnimations === 'function' ? document.getAnimations() : [];
+      result.animationsFound = animations.length;
+      for (const anim of animations) {
+        try {
+          anim.pause();
+          try { anim.currentTime = 0; } catch (e) { /* some animations reject seeking */ }
+          if (anim.playState === 'paused') result.animationsPaused++;
+        } catch (e) { /* best effort per animation */ }
+      }
+    } catch (e) { /* getAnimations unavailable */ }
+
+    // (b) GSAP: pause the global timeline at time 0 (slide 1).
+    try {
+      if (window.gsap && window.gsap.globalTimeline) {
+        result.gsapFound = true;
+        try {
+          window.gsap.globalTimeline.pause(0);
+          result.gsapPaused = true;
+        } catch (e) {
+          try {
+            window.gsap.globalTimeline.progress(0);
+            window.gsap.globalTimeline.pause();
+            result.gsapPaused = true;
+          } catch (e2) { /* best effort */ }
+        }
+      }
+    } catch (e) { /* no GSAP */ }
+
+    return result;
+  }).catch(() => null).then((r) => r || { animationsFound: 0, animationsPaused: 0, gsapFound: false, gsapPaused: false });
+
+  const freeze = {
+    attempted: true,
+    isiFound: Boolean(isiPin && isiPin.found),
+    isiSelector: isiPin ? isiPin.selector : null,
+    animationsFound: freezeRaw.animationsFound || 0,
+    animationsPaused: freezeRaw.animationsPaused || 0,
+    gsapFound: Boolean(freezeRaw.gsapFound),
+    gsapPaused: Boolean(freezeRaw.gsapPaused),
+    warning: null
+  };
+
+  if (freeze.animationsPaused > 0 || freeze.gsapPaused) {
+    logger.info(`Slides-first: banner frozen on first slide — paused ${freeze.animationsPaused}/${freeze.animationsFound} Web Animation(s) at currentTime 0${freeze.gsapPaused ? ' and the GSAP global timeline at time 0' : ''}. ISI scroll capture may now begin.`);
+  } else {
+    freeze.warning = 'No CSS/Web animations or GSAP timeline found to freeze; the banner could not be verifiably held on slide 1 during ISI scroll capture.';
+    logger.warn(`Slides-first: ${freeze.warning}`);
+  }
+
+  return { waitedMs, freeze, samples };
 }

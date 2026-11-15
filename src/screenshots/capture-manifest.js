@@ -17,6 +17,8 @@ export async function createCaptureManifest(jobId, jobConfig, sectionData, scrol
     },
     captureSettings: {
       animationDelayMs: jobConfig.animationDelay ?? DEFAULT_CONFIG.defaultTimeouts.animationDelay,
+      slidesDurationMs: jobConfig.slidesDuration ?? DEFAULT_CONFIG.defaultTimeouts.slidesDuration,
+      slidesFreeze: jobConfig.slidesFreeze ?? null,
       overlap: jobConfig.overlap ?? DEFAULT_CONFIG.defaultOverlap
     },
     selectors: {
